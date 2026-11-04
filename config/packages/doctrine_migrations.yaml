@@ -1,0 +1,13 @@
+doctrine_migrations:
+    # Default `migrations/` folder, one sub-folder per bounded context (plus Shared for
+    # outbox/inbox tables). All run against the same DB and share one version table,
+    # ordered by timestamp, so each context may only change its own tables.
+    # Cross-context foreign keys are allowed (see docs/project/00-project-context.md §7).
+    # Each new context adds its line here when it is scaffolded, e.g.:
+    #   'DoctrineMigrations\Identity': '%kernel.project_dir%/migrations/Identity'
+    migrations_paths:
+        'DoctrineMigrations\Shared': '%kernel.project_dir%/migrations/Shared'
+    services:
+        # Sort by timestamp, not by namespace (see the class docblock).
+        'Doctrine\Migrations\Version\Comparator': 'App\Shared\Infrastructure\Doctrine\TimestampVersionComparator'
+    enable_profiler: false

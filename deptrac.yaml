@@ -1,0 +1,20 @@
+deptrac:
+    paths:
+        - src
+    layers:
+        - name: SharedKernel
+          collectors:
+            - type: classLike
+              value: ^App\\SharedKernel\\.*
+        - name: Shared
+          collectors:
+            - type: classLike
+              value: ^App\\Shared\\.*
+        - name: Kernel
+          collectors:
+            - type: classLike
+              value: ^App\\Kernel$
+    ruleset:
+        Shared: [SharedKernel]
+        SharedKernel: []
+        Kernel: [Shared, SharedKernel]

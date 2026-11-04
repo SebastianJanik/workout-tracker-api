@@ -1,0 +1,53 @@
+framework:
+    messenger:
+        default_bus: command.bus
+
+        # Three separate buses (like three differently-configured Laravel dispatchers).
+        buses:
+            command.bus:
+                middleware:
+                    - validation
+                    - doctrine_transaction
+            query.bus: ~
+            event.bus:
+                # events may have zero handlers (nobody has to listen)
+                default_middleware:
+                    allow_no_handlers: true
+
+        failure_transport: failed
+
+        transports:
+            # Transactional outbox: written in the same DB transaction as the business change,
+            # then relayed to Kafka by `messenger:consume outbox`.
+            outbox:
+                dsn: 'doctrine://default?queue_name=outbox&auto_setup=0'
+                retry_strategy:
+                    max_retries: 5
+                    delay: 1000
+                    multiplier: 2
+
+            # Kafka cannot delay or requeue a message, so delayed retries go through a DB queue.
+            retry:
+                dsn: 'doctrine://default?queue_name=retry&auto_setup=0'
+                retry_strategy:
+                    max_retries: 5
+                    delay: 5000
+                    multiplier: 3
+
+            failed: 'doctrine://default?queue_name=failed&auto_setup=0'
+
+            # One Kafka transport per context topic (key = athleteId is set by the serializer).
+            kafka_progress:
+                dsn: '%env(KAFKA_URL)%'
+                options:
+                    topic:
+                        name: 'progress.events'
+                    commitAsync: false
+                    receiveTimeout: 1000
+                    kafka_conf:
+                        enable.auto.offset.store: 'false'
+                        group.id: 'progress'
+                    topic_conf:
+                        auto.offset.reset: 'earliest'
+
+        routing: ~

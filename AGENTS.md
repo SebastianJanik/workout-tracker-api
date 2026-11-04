@@ -61,20 +61,14 @@ Three specifics worth spelling out, because they are easy to get wrong:
 
 ## Everyday workflow
 
-- Run the app with `symfony serve -d`, and commands with `symfony console ...`
-  (or `bin/console` when the Symfony CLI isn't available).
+- Run every PHP, Composer and console command inside the container, never on the
+  host: `docker compose exec php bin/console ...` (add `-T` in scripts and hooks,
+  where there is no TTY).
 - When something fails, read `var/log/dev.log` and the web profiler
   (`/_profiler`) before changing code.
-- If `maker-bundle` is installed, prefer `bin/console make:*` with every argument
-  passed up front and `--no-interaction` where supported: makers prompt on a
-  terminal by default, which hangs a non-interactive shell. If a maker still
-  needs interactive input, hand-write the code instead.
-- If Doctrine ORM is installed, schema changes go through migrations
-  (`bin/console make:migration`, then `doctrine:migrations:migrate`), never
-  `doctrine:schema:update` or hand-written SQL.
 - `.env` is committed and holds defaults only. Real secrets belong in `.env.local`
-  (git-ignored) or the secrets vault (`bin/console secrets:set`), read via
-  `%env(...)%`.
+  (git-ignored) or the secrets vault
+  (`docker compose exec php bin/console secrets:set`), read via `%env(...)%`.
 
 ## Testing
 
