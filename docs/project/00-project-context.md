@@ -71,13 +71,13 @@ workout-tracker-api/
 ├── bin/ config/ public/ migrations/
 ├── src/
 │   ├── SharedKernel/             # IDs, Duration, Mass, shared ports
-│   ├── Shared/Infrastructure/    # buses, outbox, inbox, Kafka
-│   ├── Identity/   {Domain,Application,Infrastructure,UI}
+│   ├── SharedKernel/Infrastructure/ # buses, outbox, inbox, Kafka
+│   ├── Identity/   {Domain,Application,Infrastructure,Presentation}
 │   ├── Coaching/   {…}
 │   ├── TrainingLibrary/ {…}      # warm-ups (later cool-downs)
 │   ├── Strength/   {…}
 │   ├── Padel/      {…}
-│   └── Progress/   {…, Domain/Analytics/CLAUDE.md}   # pure core
+│   └── Progress/   {…, Domain/Strength/CLAUDE.md}   # pure core
 ├── tests/
 ├── tools/mcp-kafka/              # MCP server (Python, in Docker)
 ├── scripts/agent-pipeline.sh
@@ -92,14 +92,16 @@ workout-tracker-api/
 
 `App\` in `composer.json` points to `src/`. Contexts are sub-namespaces, e.g. `App\Strength\Domain\StrengthSession`.
 
+**Folders inside `Domain/`:** group by DDD building block, never flat (under the module folder if there is one). Today: `ValueObject/` (including enums) and `Service/`. Add a new folder (`Entity/`, `Repository/`, `Event/`, ...) only when a class needs it, and propose it first. Reference: `Progress/Domain/Strength`.
+
 ## 7. Architectural rules (summary)
 
-- **DDD:** contexts Identity, Coaching, TrainingLibrary, Strength, Padel, Progress + SharedKernel. Layers Domain / Application / Infrastructure / UI.
+- **DDD:** contexts Identity, Coaching, TrainingLibrary, Strength, Padel, Progress + SharedKernel. Layers Domain / Application / Infrastructure / Presentation.
 - The **domain** does not depend on Symfony or Doctrine. It may use PSR interfaces, e.g. `Psr\Clock\ClockInterface`. Deptrac enforces this.
 - **Between contexts**, communication goes only through integration events (Kafka, versioned schemas in `docs/contracts/`) or a context's public API (facade or query). Never through another context's entities or repositories.
 - **Database:** one PostgreSQL database, migrations in `migrations/<Context>/` (namespace `DoctrineMigrations\<Context>`, one shared timeline). Each context owns its tables. **Cross-context foreign keys are allowed in migrations** (DB-level integrity, e.g. `strength_session.athlete_id` → Coaching's athlete table). The code boundary stays strict: no ORM relations across contexts, only plain ID value objects (`AthleteId`), and no JOINs into another context's tables; data comes through the facade or events. Keep in mind that an FK couples the schemas (migration order, tests need the referenced rows) and can reject a valid write when the referenced row is created asynchronously from a Kafka event, so use it only where the referenced row is guaranteed to exist first.
 - **Transactional Outbox** → Kafka; idempotent consumers (inbox keyed by `eventId`). The partition key is `athleteId`, which guarantees per-athlete event ordering.
-- **Pure core** Progress Analytics: plain PHP, no I/O, injected time, deterministic. Contract tests are protected by a hook.
+- **Pure core** Progress Analytics: plain PHP, no I/O, injected time, deterministic.
 - **Contract with mobile:** `docs/api/openapi.json` (exported from Nelmio). An API change = updating this file in the same commit; the mobile repo generates its client from it.
 - **Language:** code, names, commits, documentation and conversation are all in English.
 
@@ -148,4 +150,6 @@ Laravel → Symfony cheat sheet (starting point for analogies):
 
 - 2026-10-27: project start, no code.
 - 2026-11-02: repo `workout-tracker-api` created. Symfony 8.1 (`symfony/skeleton`) runs in Docker (FrankenPHP + PostgreSQL 17), welcome page at http://localhost:8000. Decisions: two separate repositories (ADR-012), everything in Docker (ADR-013), Symfony 8.1 (ADR-001), English as the working language (ADR-014). Project documents moved to `docs/project/`.
-- **Next step:** start task 1 with `/init` in Claude Code, then finish task 0 (Kafka, kafka-ui, mailpit, Messenger, `/api/health`) and task 0b.
+- 2026-11-04: Task 0 infrastructure done: Kafka (KRaft), kafka-ui, mailpit, `rdkafka`; Messenger with `command.bus`/`query.bus`/`event.bus` and outbox/retry/failed (Doctrine) + `kafka_progress` transports; Doctrine ORM and migrations (`migrations/<Context>/`, timestamp-ordered); `GET /api/health`; PHPUnit, PHPStan (max), PHP-CS-Fixer, Deptrac. Task 0b done: pure Progress analytics core (`StrengthAnalyzer`, contract tests in suite `progress-contract`); strength only, runs on persisted data. Decisions in `docs/progress/DECISIONS.md`.
+- **Open from Task 0:** `UserRegistered` through outbox → Kafka → Coaching consumer (needs M1), `docs/api/openapi.json` export (needs Nelmio, not installed).
+- **Next step:** task 1: rework `CLAUDE.md` (add stack and commands, Messenger/Kafka rules, conventions, prohibitions, nested `src/Progress/Domain/Strength/CLAUDE.md`), with 3 LOG.md entries; then M1.

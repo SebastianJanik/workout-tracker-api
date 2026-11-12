@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Read first
 
-`docs/project/00-project-context.md` is the starting document; `01-domain-model.md`, `02-design-patterns.md` and `03-implementation-plan.md` sit next to it. The plan describes the target state (DDD contexts, Kafka, JWT, Deptrac, ...). **The code is currently just a Symfony 8.1 skeleton** (`src/Kernel.php`, an empty `src/Controller/`), with only `framework-bundle`, `console`, `dotenv`, `yaml` and `flex` installed. No Doctrine, Messenger, Security, PHPUnit or other tooling exists yet. Check `composer.json` and the plan's status (§10 of the context doc, task list in the plan) before assuming something is there.
+`docs/project/00-project-context.md` is the starting document; `01-domain-model.md`, `02-design-patterns.md` and `03-implementation-plan.md` sit next to it. The plan describes the target state (DDD contexts, Kafka, JWT, Deptrac, ...). **Currently built:** the Symfony 8.1 infrastructure (Doctrine ORM + migrations, Messenger buses and transports, Kafka, `GET /api/health`), the quality tooling (PHPUnit, PHPStan, PHP-CS-Fixer, Deptrac) and the pure Progress core for strength (`src/Progress/Domain/Strength`, decisions in `docs/progress/DECISIONS.md`). No Security, Nelmio or other contexts exist yet. Check `composer.json` and the plan's status (§10 of the context doc, task list in the plan) before assuming something is there.
 
 This repo is the **backend only**. The mobile app lives in a separate repo, `workout-tracker-mobile`.
 
@@ -21,14 +21,26 @@ docker compose exec php composer require ...
 docker compose exec -T php ...                # use -T in scripts/hooks (no TTY)
 ```
 
-Services: `php` (FrankenPHP, PHP 8.4, `pdo_pgsql intl zip opcache`) and `postgres` 17 (db/user/password `workout`/`app`/`app`, port 5432). The docs refer to `compose.yaml` and `docker/php/Dockerfile`, but the files currently in the repo root are `docker-compose.yaml` and `Dockerfile`.
+Services: `php` (FrankenPHP, PHP 8.4, `pdo_pgsql intl zip opcache rdkafka`), `postgres` 17 (db/user/password `workout`/`app`/`app`, port 5432), `kafka` (KRaft), `kafka-ui` (:8080) and `mailpit` (:8025). The docs refer to `compose.yaml` and `docker/php/Dockerfile`, but the files currently in the repo root are `docker-compose.yaml` and `Dockerfile`.
 
-Tests, PHPStan, PHP-CS-Fixer and Deptrac are planned but **not installed**. Don't assume the commands in the plan exist; install tools only after asking.
+Quality tools (all installed, run in the container):
+
+```
+docker compose exec -T php vendor/bin/phpunit                          # default suite
+docker compose exec -T php vendor/bin/phpunit --testsuite progress-contract
+docker compose exec -T php vendor/bin/phpstan analyse
+docker compose exec -T php vendor/bin/php-cs-fixer fix --dry-run --diff
+docker compose exec -T php vendor/bin/deptrac analyse
+docker compose exec -T php bin/console lint:container
+```
+
+A pre-commit hook in `.githooks/` (`core.hooksPath`) checks for debug dumps and code style. Install further tools only after asking.
 
 ## Architecture (planned, per docs)
 
-- DDD bounded contexts as sub-namespaces of `App\` (`src/<Context>/{Domain,Application,Infrastructure,UI}`): Identity, Coaching, TrainingLibrary, Strength, Padel, Progress, plus SharedKernel. Strength and Padel sessions are separate models, not one table with a flag. New training types must be addable without modifying existing ones.
+- DDD bounded contexts as sub-namespaces of `App\` (`src/<Context>/{Domain,Application,Infrastructure,Presentation}`): Identity, Coaching, TrainingLibrary, Strength, Padel, Progress, plus SharedKernel. Strength and Padel sessions are separate models, not one table with a flag. New training types must be addable without modifying existing ones.
 - The domain layer does not depend on Symfony or Doctrine (PSR interfaces such as `ClockInterface` are fine). Doctrine mappings are XML, outside the domain.
+- Inside `Domain/` group classes by DDD building block, never flat. Currently used: `ValueObject/` (incl. enums) and `Service/` (see `src/Progress/Domain/Strength`). Don't create or suggest other folders up front. If a class doesn't fit an existing folder (e.g. the first aggregate, repository port or domain event), propose a new folder named after its DDD building block and ask before adding it.
 - Contexts talk to each other only via integration events (outbox, then Kafka, partition key `athleteId`, idempotent inbox consumers) or a context's public facade/query, never through another context's entities or repositories.
 - Messenger has separate `command.bus`, `query.bus` and `event.bus`.
 - `Progress` analytics is a pure core: plain PHP, no I/O, injected time, deterministic.

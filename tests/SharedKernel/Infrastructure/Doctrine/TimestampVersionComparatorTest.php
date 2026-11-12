@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Shared\Infrastructure\Doctrine;
+namespace App\Tests\SharedKernel\Infrastructure\Doctrine;
 
-use App\Shared\Infrastructure\Doctrine\TimestampVersionComparator;
+use App\SharedKernel\Infrastructure\Doctrine\TimestampVersionComparator;
 use Doctrine\Migrations\Version\Version;
 use PHPUnit\Framework\TestCase;
 

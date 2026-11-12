@@ -1,3 +1,6 @@
 {
-    "files.autoSave": "afterDelay"
+    "files.autoSave": "afterDelay",
+    "php.validate.enable": true,
+    "php.validate.executablePath": "${workspaceFolder}/bin/php-docker",
+    "php.validate.run": "onType"
 }

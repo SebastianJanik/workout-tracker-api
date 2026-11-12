@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pre-commit: (1) no debug dumps in added lines, (2) PHP-CS-Fixer on staged PHP files.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(php|twig)$')
+[ -z "$FILES" ] && exit 0
+
+# 1. Debug leftovers (only lines being added in this commit)
+DUMPS=$(git diff --cached -U0 --diff-filter=ACMR -- $FILES | grep -E '^\+[^+]' \
+  | grep -E '(^\+|[^A-Za-z0-9_>:$])(dump|dd|dumpe|var_dump|var_export|print_r|ray|error_log)\(|\{\{\s*dump\(|\{%\s*dump\b')
+if [ -n "$DUMPS" ]; then
+  echo "pre-commit: debug dump found in staged changes:" >&2
+  echo "$DUMPS" >&2
+  exit 1
+fi
+
+# 2. Code style (runs in Docker, see CLAUDE.md)
+PHP_FILES=$(echo "$FILES" | grep '\.php$')
+[ -z "$PHP_FILES" ] && exit 0
+if ! docker compose exec -T php true >/dev/null 2>&1; then
+  echo "pre-commit: php container is not running (docker compose up -d)." >&2
+  exit 1
+fi
+if ! echo "$PHP_FILES" | xargs docker compose exec -T php vendor/bin/php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php --path-mode=intersection --; then
+  echo >&2
+  echo "pre-commit: code style violations. Fix with:" >&2
+  echo "  docker compose exec -T php vendor/bin/php-cs-fixer fix   # then re-stage (git add)" >&2
+  exit 1
+fi

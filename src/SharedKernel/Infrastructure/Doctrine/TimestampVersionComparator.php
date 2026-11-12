@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\Doctrine;
+namespace App\SharedKernel\Infrastructure\Doctrine;
 
 use Doctrine\Migrations\Version\Comparator;
 use Doctrine\Migrations\Version\Version;

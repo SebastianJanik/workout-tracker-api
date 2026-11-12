@@ -28,14 +28,14 @@ Goal: use as many patterns as possible **where they genuinely make sense**, and 
 | Domain Service | `PersonalRecordDetector`, `HandoverEligibility` |
 | Specification | `ValidPadelSetScore`, `SetMatchesMeasurementProfile`, `ReadyForLoadIncrease` |
 | Policy | `AthleteAccessPolicy`, `ProgressionPolicy` |
-| Module | sub-folders `Domain/Catalog`, `Domain/Session` |
+| Module | sub-folders `Domain/Catalog`, `Domain/Session`; inside a module, one folder per DDD building block (`Entity/`, `ValueObject/`, `Service/`, ...) |
 
 ## 3. Architecture and integration
 
 | Pattern | Where | Symfony / learning |
 |---|---|---|
 | Hexagonal (Ports & Adapters) | Domain and Application define ports, Infrastructure holds adapters | DI, interfaces → implementations |
-| Layered Architecture | Domain / Application / Infrastructure / UI | Deptrac |
+| Layered Architecture | Domain / Application / Infrastructure / Presentation | Deptrac |
 | CQRS | separate command, query and event buses | Messenger: multiple buses, `#[AsMessageHandler(bus: …)]` |
 | Event-Driven Architecture | Kafka between contexts | Messenger + `koco/messenger-kafka` |
 | **Transactional Outbox** | events go to the Doctrine `outbox` transport within the transaction; a relay moves them to Kafka | `doctrine_transaction` middleware, `DispatchAfterCurrentBusStamp` |
@@ -63,7 +63,7 @@ Goal: use as many patterns as possible **where they genuinely make sense**, and 
 
 | Pattern | Where | Symfony / learning |
 |---|---|---|
-| Composite | session blocks: `SingleExerciseBlock`, `SupersetBlock`, `CircuitBlock` | — |
+| Composite | session blocks: `SingleExerciseBlock`, `SupersetBlock`, `CircuitBlock` (Progress had a `CompositeProgressAnalyzer`; removed 2026-11-09, strength only) | — |
 | Adapter | `SecurityUser` (domain `User` → `UserInterface`), Kafka transport | Security |
 | Decorator | `CachedExerciseCatalog`, `LoggingCommandBus` | `#[AsDecorator]` |
 | Facade | `CoachingFacade`, a context's public API | — |
@@ -74,7 +74,7 @@ Goal: use as many patterns as possible **where they genuinely make sense**, and 
 
 | Pattern | Where | Symfony / learning |
 |---|---|---|
-| Strategy | `E1rmFormula`, `ProgressionRule`, `TimelineEntryRenderer`, `MeasurementProfile` | **tagged services** + `#[AutowireIterator]` / `#[AutowireLocator]` |
+| Strategy | `ProgressionRule`, `TimelineEntryRenderer`, `MeasurementProfile` | **tagged services** + `#[AutowireIterator]` / `#[AutowireLocator]` |
 | State | `SessionStatus`: Planned, InProgress, Completed, Cancelled (state classes in the domain) | comparison with Workflow (ADR-009) |
 | Command | CQRS commands (`LogSet`, `CompleteStrengthSession`) | Messenger |
 | Mediator | command bus | Messenger |
@@ -102,11 +102,11 @@ Goal: use as many patterns as possible **where they genuinely make sense**, and 
 
 | Pattern | Where |
 |---|---|
-| Contract Tests (golden scenarios) | `tests/Progress/Contract` (protected by a hook) |
+| Contract Tests (golden scenarios) | `tests/Progress/Contract` |
 | Object Mother / Test Data Builder | `tests/**/Mother`, `*Builder` |
 | In-memory adapters | `InMemoryStrengthSessionRepository`, `in-memory://` transport |
 | Approval / Snapshot | comparing the analysis report to a reference file |
-| Mutation testing | Infection on `Progress/Domain/Analytics` |
+| Mutation testing | Infection on `Progress/Domain/Strength` |
 | Architecture tests | Deptrac (+ possibly PHPat) |
 
 ## 9. Anti-patterns we watch for (for the code reviewer)

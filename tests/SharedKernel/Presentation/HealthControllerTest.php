@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Shared\UI;
+namespace App\Tests\SharedKernel\Presentation;
 
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 

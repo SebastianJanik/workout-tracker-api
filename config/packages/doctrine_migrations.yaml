@@ -9,5 +9,5 @@ doctrine_migrations:
         'DoctrineMigrations\Shared': '%kernel.project_dir%/migrations/Shared'
     services:
         # Sort by timestamp, not by namespace (see the class docblock).
-        'Doctrine\Migrations\Version\Comparator': 'App\Shared\Infrastructure\Doctrine\TimestampVersionComparator'
+        'Doctrine\Migrations\Version\Comparator': 'App\SharedKernel\Infrastructure\Doctrine\TimestampVersionComparator'
     enable_profiler: false

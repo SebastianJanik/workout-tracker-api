@@ -86,16 +86,18 @@ Read side (projections built from Kafka):
 - `SkillTrend`: success-rate trend per padel skill.
 - `AthleteBrief` (**the Athlete Brief**): current priorities, limitations, most-used warm-ups, open goals, working loads, PRs, recent matches with observations, engine recommendations.
 
-**Pure core:** `Progress/Domain/Analytics`
+**Pure core:** `Progress/Domain/Strength` (strength sessions only; padel is a plain session list in the Padel context)
 ```php
-interface ProgressAnalyzer
+final class StrengthAnalyzer
 {
-    public function analyze(AthleteHistory $history, AnalysisPeriod $period): ProgressReport;
+    /** @param list<StrengthSessionRecord> $sessions */
+    public function analyze(array $sessions, AnalysisPeriod $period): StrengthReport;
 }
 ```
-- `ProgressReport`: e1RM and PR per exercise, volume load, progression suggestions, padel trends, `confidence` and the list of sessions taken into account (explainability).
-- Strategies: `E1rmFormula` (Epley | Brzycki | Lombardi), `ProgressionRule` (Linear | DoubleProgression), e.g. "all working sets hit the target reps for 2 sessions → +2.5 kg".
-- Modes: **ad hoc** ("dry-run" endpoint, history in the request body, nothing is persisted) and **persisted** (Kafka event → recalculation → `ProgressRecalculated`).
+- `StrengthReport`: per exercise series (e1RM, most reps or longest hold; PR; volume or total seconds) and the list of sessions taken into account (explainability). A loaded hold is a series per load.
+- `Measurement`, fixed per exercise: `LoadAndReps`, `Reps`, `Duration`, `LoadAndDuration`. A weighted variant (weighted pull-up, weighted dead hang) is a different exercise.
+- Strategies: `ProgressionRule` (Linear | DoubleProgression), e.g. "all working sets hit the target reps for 2 sessions → +2.5 kg".
+- Analysis always runs on **persisted** data (Kafka event → recalculation → `ProgressRecalculated`). There is no ad hoc mode. See `docs/progress/DECISIONS.md` (2026-11-09).
 
 ## 4. Integration events (Published Language)
 
@@ -117,7 +119,7 @@ Rules:
 
 ## 5. Key flows
 
-1. **Recording a strength session:** `CompleteStrengthSession` (command) → aggregate → domain event → mapping to an integration event → **outbox** (same transaction) → relay → `strength.events` → Progress consumer (inbox) → ACL → projection update → `ProgressAnalyzer` → `ProgressRecalculated`.
+1. **Recording a strength session:** `CompleteStrengthSession` (command) → aggregate → domain event → mapping to an integration event → **outbox** (same transaction) → relay → `strength.events` → Progress consumer (inbox) → ACL → projection update → `StrengthAnalyzer` → `ProgressRecalculated`.
 2. **Planning a session:** query `GetLastPerformance(athleteId, exerciseIds[])` reads from `ExercisePerformanceHistory` (CQRS read).
 3. **Athlete handover:** `RequestHandover` → Workflow (requested → accepted | rejected | expired) → `AthleteHandedOver` → the new coach sees the `AthleteBrief`.
 4. **Warm-up at the start of a session:** the coach picks a warm-up from the library → `AttachWarmUp(sessionId, routineId)` → a handler in Strength/Padel fetches a snapshot from `WarmUpCatalog` → the session aggregate stores `SessionWarmUp` (copy + source version). The session-completed event carries a warm-up summary (name, outcome), but Progress does **not** count it towards PRs, e1RM or volume.

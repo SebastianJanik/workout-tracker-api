@@ -2,19 +2,44 @@ deptrac:
     paths:
         - src
     layers:
-        - name: SharedKernel
+        - name: Framework
           collectors:
             - type: classLike
-              value: ^App\\SharedKernel\\.*
-        - name: Shared
+              value: ^(Symfony|Doctrine)\\.*
+        - name: SharedKernelDomain
           collectors:
             - type: classLike
-              value: ^App\\Shared\\.*
+              value: ^App\\SharedKernel\\Domain\\.*
+        - name: SharedKernelInfrastructure
+          collectors:
+            - type: classLike
+              value: ^App\\SharedKernel\\Infrastructure\\.*
+        - name: SharedKernelPresentation
+          collectors:
+            - type: classLike
+              value: ^App\\SharedKernel\\Presentation\\.*
         - name: Kernel
           collectors:
             - type: classLike
               value: ^App\\Kernel$
+        - name: ProgressDomain
+          collectors:
+            - type: classLike
+              value: ^App\\Progress\\Domain\\.*
+        - name: ProgressApplication
+          collectors:
+            - type: classLike
+              value: ^App\\Progress\\Application\\.*
+        - name: ProgressPresentation
+          collectors:
+            - type: classLike
+              value: ^App\\Progress\\Presentation\\.*
     ruleset:
-        Shared: [SharedKernel]
-        SharedKernel: []
-        Kernel: [Shared, SharedKernel]
+        # A domain layer depends on SharedKernelDomain only: never on Symfony, Doctrine or other contexts.
+        ProgressDomain: [SharedKernelDomain]
+        ProgressApplication: [ProgressDomain, SharedKernelDomain, Framework]
+        ProgressPresentation: [ProgressApplication, ProgressDomain, SharedKernelDomain, Framework]
+        SharedKernelDomain: []
+        SharedKernelInfrastructure: [SharedKernelDomain, Framework]
+        SharedKernelPresentation: [SharedKernelDomain, Framework]
+        Kernel: [SharedKernelDomain, SharedKernelInfrastructure, SharedKernelPresentation, Framework]
