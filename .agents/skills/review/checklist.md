@@ -1,10 +1,10 @@
 # Review checklist
 
-Single source for the `review` skill and the `code-reviewer` subagent. It holds general rules only. Repo-specific rules (folders, commands, prohibitions, decisions) live in `CLAUDE.md`, nested `CLAUDE.md` files and `docs/`; read those for the changed paths and treat a violation as a finding. Apply only the sections the diff touches. Review the code, not product decisions recorded in the docs.
+Single source for the `review` skill and the `code-reviewer` subagent. It holds general rules only. Repo-specific rules (folders, commands, prohibitions, decisions) live in `AGENTS.md`, nested `AGENTS.md` files and `docs/`; read those for the changed paths and treat a violation as a finding. Apply only the sections the diff touches. Review the code, not product decisions recorded in the docs.
 
 ## 1. Project rules
 
-- The change follows `CLAUDE.md`, any nested `CLAUDE.md` for the touched paths, and the architecture docs it points to.
+- The change follows `AGENTS.md`, any nested `AGENTS.md` for the touched paths, and the architecture docs it points to.
 - Decisions recorded in ADRs / decision logs are not silently reversed; a changed decision comes with a new record.
 - Files that must be updated together with a change (API contract, schemas, decision logs, docs) are updated in the same change.
 - Existing guards (tests, static analysis, architecture checks, code style) pass and were not weakened to make the change pass. Tests and contracts are not edited just to turn them green.

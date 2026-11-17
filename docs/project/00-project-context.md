@@ -1,6 +1,6 @@
 # Workout Tracker — project context
 
-> Starting document. Read it before any work in this repository. Details live in the same folder (`docs/project/`): `01-domain-model.md`, `02-design-patterns.md`, `03-implementation-plan.md`.
+> Starting document: what the product is and why. Working rules (environment, commands, architecture, conventions) are in `AGENTS.md`. Details live in the same folder (`docs/project/`): `01-domain-model.md`, `02-design-patterns.md`, `03-implementation-plan.md` (agentic tasks, DoD, status, ADRs).
 >
 > This repository (`workout-tracker-api`) contains **the backend only**. The mobile app lives in a separate repository, `workout-tracker-mobile` (ADR-012).
 
@@ -12,7 +12,7 @@ An app for **coaches** to manage their **athletes** and record their progress. A
 
 ## 2. Project goals (in order of priority)
 
-1. **Learning to work with an AI agent (Claude Code).** Seven agentic tasks: rule files, slash commands and skills, hooks, a custom MCP server, subagents, orchestration and a personal workflow. Each one **must** be completed with evidence in `docs/agentic-workflow/LOG.md`. This is priority #1 and wins any conflict.
+1. **Learning to work with an AI agent (Claude Code).** Seven agentic tasks: rule files, slash commands and skills, hooks, a custom MCP server, subagents, orchestration and a personal workflow. Each one has a definition of done in `03-implementation-plan.md`. This is priority #1 and wins any conflict.
 2. **Learning Symfony.** Equally important: modern Symfony with DDD, Messenger, Security, Doctrine (XML mappings), Workflow, Scheduler and DI (tagged services, decorators).
 3. **The product.** It should be genuinely useful, but it remains a training ground for goals 1 and 2.
 
@@ -30,7 +30,7 @@ An app for **coaches** to manage their **athletes** and record their progress. A
 - Athlete history, personal records (PRs), trends and the Athlete Brief.
 - UI: React Native (Expo) on iOS, Android and web, **in a separate repository**. The backend exposes an API described with OpenAPI.
 
-**Far future (not now, only after everything else is done):** AI-based video analysis of padel sessions as a premium feature, requiring the user's own API key. Details in `03-implementation-plan.md` §7. We don't design for it ahead of time.
+**Far future (not now, only after everything else is done):** AI-based video analysis of padel sessions as a premium feature, requiring the user's own API key. Details in `03-implementation-plan.md` §6. We don't design for it ahead of time.
 
 ## 4. Stack
 
@@ -43,41 +43,24 @@ An app for **coaches** to manage their **athletes** and record their progress. A
 | API | Controllers + DTOs (`#[MapRequestPayload]`), OpenAPI via NelmioApiDocBundle, JWT (lexik) + refresh tokens |
 | Quality | PHPUnit, PHPStan (max), PHP-CS-Fixer, **Deptrac** (layer and context boundaries), Infection (mutation testing of the core), lefthook |
 | Agent | Claude Code (VS Code extension + CLI); custom MCP server in Python (FastMCP + confluent-kafka), run in Docker |
-| Infra | Docker Compose (OrbStack): php, postgres, kafka, kafka-ui, mailpit |
+| Infra | Docker Compose (OrbStack): php, postgres, kafka, kafka-ui, mailpit. No PHP, Composer or Node on the host (ADR-013); how to run things: `AGENTS.md` |
 | Mobile | **separate repo** `workout-tracker-mobile`: Expo + React Native + TypeScript, client generated from this repo's `openapi.json` |
 
-## 5. Environment: everything through Docker (ADR-013)
-
-**There is no PHP, Composer or Node on the host.** Locally: `git`, OrbStack, VS Code + Claude Code, `jq` (the only exception: agent hooks run on the host).
-
-| Instead of (Laravel / local) | We use |
-|---|---|
-| `php artisan …` | `docker compose exec php bin/console …` |
-| `composer require …` | `docker compose exec php composer require …` |
-| `vendor/bin/phpunit` | `docker compose exec php vendor/bin/phpunit` |
-| `php artisan serve` | `docker compose up -d` → http://localhost:8000 |
-
-- Files: `compose.yaml` (repo root), `docker/php/Dockerfile`.
-- `composer.json` has `extra.symfony.docker = false`. Flex does **not** generate its own Docker files, because we have ours.
-- In scripts and hooks, call commands with `-T` (`docker compose exec -T php …`), because there's no TTY there.
-
-## 6. Repository structure
+## 5. Repository structure
 
 ```
 workout-tracker-api/
-├── CLAUDE.md                     # main rules (task 1)
-├── compose.yaml
-├── docker/php/Dockerfile
-├── bin/ config/ public/ migrations/
+├── AGENTS.md  CLAUDE.md          # working rules (shared); CLAUDE.md = @AGENTS.md + Claude extras
+├── docker-compose.yaml  Dockerfile
+├── bin/ config/ public/ migrations/<Context>/
 ├── src/
-│   ├── SharedKernel/             # IDs, Duration, Mass, shared ports
-│   ├── SharedKernel/Infrastructure/ # buses, outbox, inbox, Kafka
+│   ├── SharedKernel/             # IDs, Duration, Mass, shared ports; Infrastructure: buses, outbox, inbox, Kafka
 │   ├── Identity/   {Domain,Application,Infrastructure,Presentation}
 │   ├── Coaching/   {…}
 │   ├── TrainingLibrary/ {…}      # warm-ups (later cool-downs)
 │   ├── Strength/   {…}
 │   ├── Padel/      {…}
-│   └── Progress/   {…, Domain/Strength/CLAUDE.md}   # pure core
+│   └── Progress/   {…, Domain/Strength/{AGENTS.md,CLAUDE.md}}   # pure core
 ├── tests/
 ├── tools/mcp-kafka/              # MCP server (Python, in Docker)
 ├── scripts/agent-pipeline.sh
@@ -86,32 +69,16 @@ workout-tracker-api/
 │   ├── domain/  adr/  specs/  progress/
 │   ├── contracts/                # event schemas
 │   ├── api/openapi.json          # contract for the mobile repo
-│   └── agentic-workflow/ {LOG.md, WORKFLOW.md}
-└── .claude/ {commands, skills, agents, hooks, settings.json}
+│   └── agentic-workflow/WORKFLOW.md
+├── .agents/skills/               # shared skills (any tool)
+└── .claude/ {skills -> ../.agents/skills, agents, hooks, settings.json}   # Claude Code only
 ```
 
-`App\` in `composer.json` points to `src/`. Contexts are sub-namespaces, e.g. `App\Strength\Domain\StrengthSession`.
+`App\` in `composer.json` points to `src/`. Contexts are sub-namespaces, e.g. `App\Strength\Domain\StrengthSession`. Layer, boundary and folder rules are in `AGENTS.md` (Architecture).
 
-**Folders inside `Domain/`:** group by DDD building block, never flat (under the module folder if there is one). Today: `ValueObject/` (including enums) and `Service/`. Add a new folder (`Entity/`, `Repository/`, `Event/`, ...) only when a class needs it, and propose it first. Reference: `Progress/Domain/Strength`.
+## 6. Laravel → Symfony cheat sheet
 
-## 7. Architectural rules (summary)
-
-- **DDD:** contexts Identity, Coaching, TrainingLibrary, Strength, Padel, Progress + SharedKernel. Layers Domain / Application / Infrastructure / Presentation.
-- The **domain** does not depend on Symfony or Doctrine. It may use PSR interfaces, e.g. `Psr\Clock\ClockInterface`. Deptrac enforces this.
-- **Between contexts**, communication goes only through integration events (Kafka, versioned schemas in `docs/contracts/`) or a context's public API (facade or query). Never through another context's entities or repositories.
-- **Database:** one PostgreSQL database, migrations in `migrations/<Context>/` (namespace `DoctrineMigrations\<Context>`, one shared timeline). Each context owns its tables. **Cross-context foreign keys are allowed in migrations** (DB-level integrity, e.g. `strength_session.athlete_id` → Coaching's athlete table). The code boundary stays strict: no ORM relations across contexts, only plain ID value objects (`AthleteId`), and no JOINs into another context's tables; data comes through the facade or events. Keep in mind that an FK couples the schemas (migration order, tests need the referenced rows) and can reject a valid write when the referenced row is created asynchronously from a Kafka event, so use it only where the referenced row is guaranteed to exist first.
-- **Transactional Outbox** → Kafka; idempotent consumers (inbox keyed by `eventId`). The partition key is `athleteId`, which guarantees per-athlete event ordering.
-- **Pure core** Progress Analytics: plain PHP, no I/O, injected time, deterministic.
-- **Contract with mobile:** `docs/api/openapi.json` (exported from Nelmio). An API change = updating this file in the same commit; the mobile repo generates its client from it.
-- **Language:** code, names, commits, documentation and conversation are all in English.
-
-## 8. About the author (knowledge level)
-
-- **Knows Laravel inside out. Is still learning Symfony.**
-- Answer questions **simply and briefly**: the core point first, details afterwards if needed.
-- Explain Symfony through **Laravel analogies** ("it's like X in Laravel, but…") and say where the analogy breaks down.
-
-Laravel → Symfony cheat sheet (starting point for analogies):
+The author knows Laravel well and is learning Symfony. Starting point for analogies (how to use it: `AGENTS.md`, Working rules):
 
 | Laravel | Symfony | Key difference |
 |---|---|---|
@@ -129,28 +96,8 @@ Laravel → Symfony cheat sheet (starting point for analogies):
 | Sanctum / Passport | Security + lexik JWT | firewalls and authenticators in `security.yaml` |
 | Artisan, `make:*` | `bin/console`, MakerBundle (`make:*`) | similar |
 | Package auto-discovery + `vendor:publish` | Symfony Flex (recipes) | a recipe creates config files itself on `composer require` |
-| Sail | our `compose.yaml` + FrankenPHP | our own setup, not a ready-made package |
+| Sail | our `docker-compose.yaml` + FrankenPHP | our own setup, not a ready-made package |
 | Task Scheduling | Scheduler component | the schedule is Messenger messages |
 | Mail / Notifications | Mailer / Notifier | similar |
 | `config/*.php` | `config/packages/*.yaml` | config per bundle, per environment |
 | Telescope / Debugbar | Web Profiler | — |
-
-## 9. How Claude should work in this repository
-
-- Answer simply, with Laravel analogies (see §8).
-- Run every PHP/Composer command inside the container (`docker compose exec php …`), never on the host.
-- For every feature, state **which agentic task (1–7)** it covers and what should go into `LOG.md`.
-- Propose **design patterns** with a justification (catalogue in `02-design-patterns.md`). Name the pattern, show where it lives in the code and say what it teaches.
-- **Teach Symfony:** the first time a component is used, briefly explain what it does (Laravel equivalent), why we use it this way, and link to the symfony.com docs.
-- Don't change ADR decisions without an explicit discussion. A new decision means a new ADR.
-- When in doubt about context boundaries, refer to `01-domain-model.md`.
-- Don't add packages (composer) without asking.
-
-## 10. Status
-
-- 2026-10-27: project start, no code.
-- 2026-11-02: repo `workout-tracker-api` created. Symfony 8.1 (`symfony/skeleton`) runs in Docker (FrankenPHP + PostgreSQL 17), welcome page at http://localhost:8000. Decisions: two separate repositories (ADR-012), everything in Docker (ADR-013), Symfony 8.1 (ADR-001), English as the working language (ADR-014). Project documents moved to `docs/project/`.
-- 2026-11-04: Task 0 infrastructure done: Kafka (KRaft), kafka-ui, mailpit, `rdkafka`; Messenger with `command.bus`/`query.bus`/`event.bus` and outbox/retry/failed (Doctrine) + `kafka_progress` transports; Doctrine ORM and migrations (`migrations/<Context>/`, timestamp-ordered); `GET /api/health`; PHPUnit, PHPStan (max), PHP-CS-Fixer, Deptrac. Task 0b done: pure Progress analytics core (`StrengthAnalyzer`, contract tests in suite `progress-contract`); strength only, runs on persisted data. Decisions in `docs/progress/DECISIONS.md`.
-- 2026-11-13: Task 2 done: `review` skill in `.claude/skills/review/` (`SKILL.md` + generic `checklist.md`, shared later with the `code-reviewer` subagent). Reviews the local diff plus a blast-radius trace of changed symbols, reports BLOCKER/MAJOR/MINOR. Usage evidence (3 real uses during M2-M4) is still to be logged.
-- **Open from Task 0:** `UserRegistered` through outbox → Kafka → Coaching consumer (needs M1), `docs/api/openapi.json` export (needs Nelmio, not installed).
-- **Next step:** task 1: rework `CLAUDE.md` (add stack and commands, Messenger/Kafka rules, conventions, prohibitions, nested `src/Progress/Domain/Strength/CLAUDE.md`), with 3 LOG.md entries; then M1.

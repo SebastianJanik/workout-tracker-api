@@ -2,7 +2,9 @@
 
 > Tasks 0–7 map onto the survey (checklist in §4). **The agentic tasks (1–7) take priority**; product features (M1–M7) are the material the agent works on.
 >
-> This plan covers the **`workout-tracker-api`** repo. Mobile items (screens, TS hooks, mobile `CLAUDE.md`) are done in the separate `workout-tracker-mobile` repo and are only mentioned here.
+> **This file is the single place for task requirements, definition of done (DoD) and status.** Every task has a `Status` line and a DoD checklist. When a DoD item is met, tick it (`- [x]`); when all are ticked, set the status to ✅ done. Status legend: ✅ done · ⏳ in progress · ☐ not started.
+>
+> This plan covers the **`workout-tracker-api`** repo. Mobile items (screens, TS hooks, mobile rule files) are done in the separate `workout-tracker-mobile` repo and are only mentioned here.
 
 ## 1. Stages and schedule
 
@@ -32,25 +34,25 @@ Assumption: about 5 h per week. With a different time budget only the "Product" 
 
 ### Task 0: playground and domain
 
-1. ✅ Repo `workout-tracker-api` (structure in `00-project-context.md` §6). Symfony 8.1 from `symfony/skeleton`, created once with the `composer:2` image. Flex has its Docker recipes disabled (`extra.symfony.docker=false`).
-2. Docker Compose (OrbStack), file `compose.yaml`:
-   - ✅ `php`: FrankenPHP (`dunglas/frankenphp:1-php8.4`), extensions `pdo_pgsql intl zip opcache`, Composer in the image, port 8000,
-   - ✅ `postgres` (17-alpine),
-   - ⏳ add `rdkafka` to the image (`install-php-extensions rdkafka`),
-   - ⏳ `kafka` (image `apache/kafka`, KRaft). Two listeners: internal `kafka:9092` for containers and external `localhost:9094` for the host,
-   - ⏳ `kafka-ui` (kafbat, port 8080), `mailpit` (ports 8025/1025).
+**Status:** ⏳ in progress (only the `UserRegistered` flow is open; it needs M1).
+
+1. Repo `workout-tracker-api` (structure in `00-project-context.md` §5). Symfony 8.1 from `symfony/skeleton`, created once with the `composer:2` image. Flex has its Docker recipes disabled (`extra.symfony.docker=false`).
+2. Docker Compose (OrbStack), file `docker-compose.yaml`: `php` (FrankenPHP `dunglas/frankenphp:1-php8.4`, extensions `pdo_pgsql intl zip opcache rdkafka`, Composer in the image, port 8000), `postgres` (17-alpine), `kafka` (`apache/kafka`, KRaft; internal listener `kafka:9092` for containers, external `localhost:9094` for the host), `kafka-ui` (kafbat, port 8080), `mailpit` (ports 8025/1025).
 3. Messenger:
    - buses `command.bus` (middleware: validation, doctrine_transaction), `query.bus`, `event.bus`,
    - transports: `outbox` (Doctrine), `kafka` (`koco/messenger-kafka`, a topic per context, key = athleteId), `failed` (Doctrine), `retry` (Doctrine, exponential backoff),
-   - **Note — Kafka is a log, not a queue:** there's no requeue, there are offsets and consumer groups. Retry and DLQ are handled by Messenger's failure transport. We need to verify when the chosen transport commits the offset on failure, and document it in ADR-002.
-4. Working commands (recorded in CLAUDE.md), all through `docker compose exec php`:
-   `vendor/bin/phpunit`, `vendor/bin/phpunit --testsuite progress-contract`, `vendor/bin/php-cs-fixer fix`, `vendor/bin/phpstan analyse`, `vendor/bin/deptrac analyse`, `bin/console lint:container`, `bin/console doctrine:schema:validate`, `bin/console messenger:consume outbox kafka_progress -vv`, `bin/console nelmio:apidoc:dump --format=json > docs/api/openapi.json`.
+   - **Note: Kafka is a log, not a queue.** There's no requeue, there are offsets and consumer groups. Retry and DLQ are handled by Messenger's failure transport. We need to verify when the chosen transport commits the offset on failure, and document it in ADR-002.
+4. Working commands live in `AGENTS.md` (Environment).
 5. On the host only: `git`, OrbStack, VS Code + Claude Code, `jq` (for hooks).
-6. `docs/agentic-workflow/LOG.md` from the template (§5).
 
-**DoD:** repo in Git, green tests, `UserRegistered` travels outbox → Kafka → consumer in Coaching (visible in Kafka UI), no Deptrac violations, `GET /api/health` returns 200, LOG.md exists.
+**DoD:**
+- [x] repo in Git, green tests, no Deptrac violations
+- [x] `GET /api/health` returns 200
+- [ ] `UserRegistered` travels outbox → Kafka → consumer in Coaching (visible in Kafka UI); needs M1
 
 ### Task 0b: pure Progress Analytics core
+
+**Status:** ✅ done.
 
 `StrengthAnalyzer::analyze(list<StrengthSessionRecord>, AnalysisPeriod): StrengthReport` (details in `01-domain-model.md` §3). Strength sessions only. e1RM via Epley, PR as the best value of a series, volume as the sum of `reps × load` (or held seconds) over counted sets. Its only job is to pass the contract tests and let us build the rest.
 
@@ -67,38 +69,60 @@ Assumption: about 5 h per week. With a different time budget only the "Product" 
 
 **Open analytics decisions** (for `docs/progress/DECISIONS.md`): the rep limit beyond which e1RM stops being reliable; the progression suggestion rule; the time window for trends; exercise comparability (squat variants); the effect of RPE/RIR.
 
-**DoD:** `StrengthAnalyzer` + the full set of contract tests green.
+**DoD:**
+- [x] `StrengthAnalyzer` + the full set of contract tests green
 
 ---
 
 ## 3. Agentic part (the main goal)
 
-### Task 1: CLAUDE.md
+### Task 1: rule files (AGENTS.md + CLAUDE.md)
 *Custom rule files tailored to a specific repository*
 
-1. `claude` → `/init`, then rewrite by hand. `/init` will read the repo, including `docs/project/`. At the top of CLAUDE.md we import the context: `@docs/project/00-project-context.md`. Sections:
-   - **Stack and commands:** versions, containers, exact commands (`docker compose exec php …`), addresses (API :8000, Kafka UI :8080, mailpit :8025).
-   - **Architecture:** 6 contexts + SharedKernel, layers, XML mapping outside the domain, repositories as interfaces, cross-context communication only via events or a facade, Deptrac as the guard.
-   - **Core rules:** Progress Analytics without the framework or I/O, time and randomness injected; every analytics change requires updating the contract tests and an entry in `docs/progress/DECISIONS.md`.
-   - **Messenger/Kafka:** messages are immutable DTOs with primitives, integration events only through the outbox, schema in `docs/contracts/`, key = athleteId, idempotent consumer (inbox), every new message type has routing, retry and a test on `in-memory://`.
-   - **Conventions:** `declare(strict_types=1)`, `final`, `readonly` DTOs, named constructors, domain exceptions instead of null, controllers only delegate.
-   - **Patterns:** reference to the catalogue; every new feature names the patterns it uses in the PR description.
-   - **Workflow:** TDD; after a change, run the affected context's tests; after an API change, export `docs/api/openapi.json`.
-   - **Prohibitions:** don't run PHP/Composer on the host, don't edit released migrations, don't touch `.env.local`, don't add packages without asking, don't delete topics or Docker volumes, don't reset consumer group offsets, don't change contract tests to make them "pass"; when in doubt, ask.
-2. Nested file: `src/Progress/Domain/Strength/CLAUDE.md` (purity, determinism, `StrengthReport` format). The mobile `CLAUDE.md` is created in the mobile repo.
-3. About 150 lines in the main file. Every recurring agent mistake becomes a rule.
+**Status:** ⏳ in progress (main files written, rules below still missing, nested file not created).
 
-**DoD:** CLAUDE.md (main + Progress core) committed, 3 entries in LOG.md where a rule actually changed the agent's behaviour.
+Layout, so that other tools and developers are supported too:
+- `AGENTS.md` holds all tool-neutral rules (the cross-tool convention). Each topic lives in exactly one file, and its header table says which.
+- `CLAUDE.md` is `@AGENTS.md` plus Claude-only extras (agentic-task bookkeeping, pointers to `.claude/`). It points to `docs/project/00-project-context.md` through `AGENTS.md` instead of importing it.
+- Nested rules go in `<dir>/AGENTS.md`, with a one-line `<dir>/CLAUDE.md` (`@AGENTS.md`) beside it, because Claude Code doesn't read nested `AGENTS.md` itself.
+- Every recurring agent mistake becomes a rule.
+
+Required content of `AGENTS.md`:
+- [x] Stack and commands: containers, exact `docker compose exec php …` commands, addresses (API :8000, Kafka UI :8080, mailpit :8025)
+- [x] Architecture: contexts, layers, XML mapping outside the domain, cross-context communication only via events or a facade, Deptrac as the guard
+- [x] Pure core: Progress Analytics without framework or I/O, injected time
+- [x] Core rules: contract tests are never changed to pass; a deliberate analytics change is recorded in `docs/progress/DECISIONS.md`
+- [ ] Messenger/Kafka: messages are immutable DTOs with primitives, integration events only through the outbox, every new message type has routing, retry and a test on `in-memory://` (bus separation, partition key and inbox are already rules)
+- [ ] Conventions: `declare(strict_types=1)`, `final`, named constructors, domain exceptions instead of null, controllers only delegate (`readonly` DTOs and thin controllers are already rules)
+- [ ] Patterns: every new feature names the patterns it uses in the PR description (naming them in answers is already a rule)
+- [ ] Workflow: TDD; after a change run the affected context's tests
+- [ ] Prohibitions: don't edit released migrations, don't touch `.env.local`, don't delete topics or Docker volumes, don't reset consumer group offsets; when in doubt, ask (no packages without asking, no host PHP and no changing contract tests are already rules)
+
+**DoD:**
+- [ ] all required content above is in `AGENTS.md`
+- [ ] nested `src/Progress/Domain/Strength/AGENTS.md` (purity, determinism, `StrengthReport` format) plus its one-line `CLAUDE.md` committed
+- [ ] `AGENTS.md` stays around 150 lines
+- [ ] a rule is shown to change the agent's behaviour in at least 3 cases (say so in the commit message)
+
+The mobile rule files are created in the mobile repo.
 
 ### Task 2: a skill
 *Custom slash commands or reusable prompts/skills*
 
-One skill is enough for the survey item ("commands / skills"): **`review`** in `.claude/skills/review/SKILL.md` (frontmatter `name`, `description`). It reviews the current `git diff` against the `code-reviewer` checklist in task 5 (single source: the skill and the subagent share it, no second copy), plus a class-in-the-right-`Domain/`-folder check.
+**Status:** ⏳ in progress (skill built, real usage still to be shown).
 
-**DoD:** the skill is in the repo, used at least 3 times on real tasks (M2-M4), entries in LOG.md. More skills or commands are added only when a task repeats often enough to need one.
+Skills are shared across tools: they live in `.agents/skills/` (the cross-tool location) and `.claude/skills` is a symlink to it, because Claude Code reads only `.claude/skills/`. Claude-only frontmatter such as `allowed-tools` is ignored by other tools. One skill is enough for the survey item ("commands / skills"): **`review`** in `.agents/skills/review/SKILL.md` (frontmatter `name`, `description`). It reviews the current `git diff` against the `code-reviewer` checklist in task 5 (single source: the skill and the subagent share it, no second copy), plus a class-in-the-right-`Domain/`-folder check.
+
+More skills or commands are added only when a task repeats often enough to need one.
+
+**DoD:**
+- [x] `review` skill (`SKILL.md` + generic `checklist.md`) is in `.agents/skills/`, symlinked from `.claude/skills`
+- [ ] used on real changes at least 3 times (M1-M4)
 
 ### Task 3: hooks and automation
 *Hooks or automation that run on agent actions*
+
+**Status:** ☐ not started.
 
 Hooks run **on the host**, so they call PHP tools through `docker compose exec -T php …`.
 
@@ -108,10 +132,15 @@ Two hooks, the two with the most value (more can be added later when a real mist
 
 Registered in `.claude/settings.json` (scripts `chmod +x`, verify via `/hooks`). The mobile equivalent of `php-quality.sh` (eslint + tsc) will be created in the mobile repo.
 
-**DoD:** 2 documented situations in LOG.md: the agent fixed a hook error by itself (PHPStan or Deptrac), and a hook blocked a dangerous command.
+**DoD:**
+- [ ] both hooks registered in `.claude/settings.json` and visible in `/hooks`
+- [ ] the agent fixed a hook error by itself (PHPStan or Deptrac)
+- [ ] a hook blocked a dangerous command
 
 ### Task 4: custom MCP server over Kafka and Messenger
 *A custom MCP server connecting the agent to an internal system*
+
+**Status:** ☐ not started.
 
 Progress recalculations go through Kafka, so an agent without visibility into topics and failed messages is blind when debugging. The server lives in `tools/mcp-kafka/` (Python, FastMCP + `confluent-kafka` + `psycopg`) and has its own `Dockerfile`. Claude Code starts it via `.mcp.json` with `docker compose run --rm -i mcp-kafka` (stdio transport). Inside the Compose network the broker is `kafka:9092`.
 
@@ -177,19 +206,24 @@ Steps: test in MCP Inspector (in a container or via `docker compose run`), regis
 
 **End-to-end scenario:** break the `RecalculateAthleteProgress` handler, e.g. a division by zero when computing the average load for an exercise that only has bodyweight sets, or a set with 0 reps. Record a few sessions and stop the consumer. Then prompt: *"Check the failed messages, find the event that breaks the handler, write a test that reproduces it, fix the handler and make sure that redelivering the same `eventId` doesn't change the result."*
 
-**DoD:** server with a README and 2 tools, error handling (broker unavailable, non-existent topic, empty partition), E2E scenario in LOG.md.
+**DoD:**
+- [ ] server with a README and the 2 tools
+- [ ] error handling: broker unavailable, non-existent topic, empty partition
+- [ ] the end-to-end scenario above runs successfully
 
 ### Task 5: subagents
 *Multiple subagents split by task type*
 
+**Status:** ☐ not started.
+
 In `.claude/agents/`:
-- `implementer`: code compliant with CLAUDE.md and TDD, full tools.
+- `implementer`: code compliant with AGENTS.md and TDD, full tools.
 - `code-reviewer`: read-only (Read, Grep, Glob, Bash for tests). Checklist below.
 - `test-writer`: tests, edge cases, handlers on `in-memory://`, Object Mothers.
 - `domain-modeler`: read-only; checks consistency with `docs/project/01-domain-model.md` and `docs/domain/` (ubiquitous language, aggregate boundaries, whether an event leaks between contexts, whether an anaemic model is emerging).
 - `mobile-implementer` will be created in the mobile repo.
 
-`code-reviewer` checklist (frontmatter `tools: Read, Grep, Glob, Bash`):
+`code-reviewer` reads the shared `.agents/skills/review/checklist.md` (frontmatter `tools: Read, Grep, Glob, Bash`). Areas it must cover:
 - Analytics core: no framework or I/O, determinism, edge cases (empty history, 0 reps, mixed units, sets without the measured value),
 - layers: domain without Doctrine and Symfony, controllers only delegate, Deptrac green,
 - Messenger/Kafka: immutable and serialisable message, idempotency (inbox), outbox in the same transaction, partition key, retry and failure transport, schema backward compatibility,
@@ -202,10 +236,14 @@ In `.claude/agents/`:
 
 Rehearsed sequence: implementer → domain-modeler → code-reviewer → BLOCKER/MAJOR fixes.
 
-**DoD:** at least 3 subagents, 2 cases in LOG.md where the reviewer (or domain-modeler) found a real problem.
+**DoD:**
+- [ ] at least 3 subagents in `.claude/agents/`
+- [ ] the reviewer (or domain-modeler) found a real problem in at least 2 cases
 
 ### Task 6: orchestration
 *Orchestrated multiple agents in parallel or in sequence*
+
+**Status:** ☐ not started.
 
 **Variant A, in parallel (git worktrees):** three independent parts, e.g.:
 - `feature/padel-match` (Padel context: match + score + Specification),
@@ -213,17 +251,21 @@ Rehearsed sequence: implementer → domain-modeler → code-reviewer → BLOCKER
 - `feature/personal-records` (Progress: PR projection + endpoint).
 
 Commands: `git worktree add ../wt-padel -b feature/padel-match` etc., a separate Claude session in each folder.
-**Docker caveat:** each worktree is a separate folder with the same `compose.yaml`. Set a different `COMPOSE_PROJECT_NAME` and different ports (e.g. via `compose.override.yaml` or per-worktree `.env` variables), otherwise the stacks will clash. Alternatively the tests can share one database and one Kafka if each worktree uses its own test database name.
+**Docker caveat:** each worktree is a separate folder with the same `docker-compose.yaml`. Set a different `COMPOSE_PROJECT_NAME` and different ports (e.g. via `compose.override.yaml` or per-worktree `.env` variables), otherwise the stacks will clash. Alternatively the tests can share one database and one Kafka if each worktree uses its own test database name.
 When merging, watch for conflicts in `messenger.yaml`, migrations and `docs/api/openapi.json`. Run the full test suite at the end.
 
 **Variant B, sequential pipeline** `scripts/agent-pipeline.sh`: spec → plan (`claude -p`, Read/Grep/Glob/Write only) → implementation (TDD) → hard gates (via `docker compose exec -T php`: php-cs-fixer `--dry-run`, PHPStan, Deptrac, `lint:container`, `schema:validate`, PHPUnit) → subagent review into `review.md`. Headless-mode flags need to be verified against current documentation.
 
 Optionally: the same pipeline in GitHub Actions with Kafka as a service container.
 
-**DoD:** variant A once on a real feature, variant B on at least 2 tasks. In LOG.md: time, result, what went wrong, what was fixed in the script.
+**DoD:**
+- [ ] variant A run once on a real feature
+- [ ] variant B run on at least 2 tasks, with script problems fixed along the way
 
 ### Task 7: a consistent workflow
 *A defined personal workflow applied consistently*
+
+**Status:** ☐ not started.
 
 `docs/agentic-workflow/WORKFLOW.md`:
 1. **Spec**: `docs/specs/NNN-name.md`. Contains the goal, acceptance criteria, out of scope, risks, affected contexts, **patterns used**, impact on the event contract (Published Language), impact on the mobile API (`openapi.json`) and on the Athlete Brief.
@@ -232,9 +274,12 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 4. **Automated verification**: hooks + CI (`.github/workflows/ci.yml`). Backend job: CS-Fixer, PHPStan, Deptrac, `lint:container`, `schema:validate`, PHPUnit with a separate `progress-contract` suite, Kafka as a service or `in-memory://`, a check that `openapi.json` is up to date. The mobile job lives in the mobile repo.
 5. **Agent review**: domain-modeler + code-reviewer.
 6. ✅ *Checkpoint 2: manual diff review*: domain logic, context boundaries, core purity, contract backward compatibility, migrations, retry/DLQ, whether the tests check behaviour.
-7. **Retro**: an agent mistake becomes a rule in CLAUDE.md or a fix to a command or hook.
+7. **Retro**: an agent mistake becomes a rule in `AGENTS.md` (or `CLAUDE.md` if Claude-only) or a fix to a command or hook.
 
-**DoD:** WORKFLOW.md, a spec template and CI in the repo; at least 5 tasks taken through the full workflow with LOG.md entries; at least 2 CLAUDE.md changes resulting from retros.
+**DoD:**
+- [ ] WORKFLOW.md, a spec template and CI in the repo
+- [ ] at least 5 tasks taken through the full workflow
+- [ ] at least 2 rule-file changes (`AGENTS.md` / `CLAUDE.md`) resulting from retros
 
 ---
 
@@ -242,21 +287,15 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 
 | Survey item | Task | Evidence |
 |---|---|---|
-| Custom rule files / project instructions | 1 | CLAUDE.md (main + Progress core; mobile in the mobile repo) + 3 LOG entries |
-| Custom slash commands / skills | 2 | `review` skill, 3 usages in LOG |
-| Hooks / automation | 3 | settings.json, 2 PHP scripts (via Docker), 2 demonstrations |
+| Custom rule files / project instructions | 1 | `AGENTS.md` + `CLAUDE.md` (shared rules + Claude extras; nested Progress core; mobile in the mobile repo) |
+| Custom slash commands / skills | 2 | `review` skill, 3 real uses |
+| Hooks / automation | 3 | `settings.json`, 2 scripts (via Docker), 2 demonstrations |
 | Custom MCP server | 4 | server with 2 tools (peek messages, failed messages) + E2E scenario |
 | Multiple subagents | 5 | `.claude/agents/` (≥3), 2 problems found |
 | Orchestrated multiple agents | 6 | worktrees + `agent-pipeline.sh`, ≥2 runs |
-| Defined personal workflow | 7 | WORKFLOW.md, CI, ≥5 tasks in LOG, ≥2 retro fixes |
+| Defined personal workflow | 7 | WORKFLOW.md, CI, ≥5 tasks, ≥2 retro fixes |
 
-## 5. Log template: `docs/agentic-workflow/LOG.md`
-
-| Date | Task / feature | Elements used (1–7) | What worked | What went wrong | Change after retro |
-|---|---|---|---|---|---|
-| YYYY-MM-DD | | | | | |
-
-## 6. Decisions (ADRs in `docs/adr/`)
+## 5. Decisions (ADRs in `docs/adr/`)
 
 | ADR | Question | Decision / recommendation |
 |---|---|---|
@@ -271,11 +310,11 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 | 009 | Session lifecycle: State or Workflow | State in the domain (sessions), Workflow in the application layer (Handover, invitations) |
 | 010 | Units | kg canonically in storage, display unit per coach/athlete |
 | 011 | Projections: Doctrine ORM or DBAL | DBAL (readable SQL for read models) |
-| 012 | Monorepo or separate repositories | **accepted:** separate (`workout-tracker-api`, `workout-tracker-mobile`). The contract is `docs/api/openapi.json`; consequence: hooks, CLAUDE.md and CI per repo, TS client generated in the mobile repo |
+| 012 | Monorepo or separate repositories | **accepted:** separate (`workout-tracker-api`, `workout-tracker-mobile`). The contract is `docs/api/openapi.json`; consequence: hooks, rule files and CI per repo, TS client generated in the mobile repo |
 | 013 | Runtime environment | **accepted:** everything in Docker (OrbStack), no local PHP/Node; FrankenPHP as the server; `symfony/skeleton` instead of `--webapp`; Flex without Docker recipes |
 | 014 | Working language | **accepted:** English for code, docs, commits and conversation with the agent |
 
-## 7. Roadmap: far future (after everything else)
+## 6. Roadmap: far future (after everything else)
 
 **AI video analysis of padel sessions (premium).** Not in the current scope; just a note so the idea isn't lost.
 - Premium feature: the coach records or uploads a clip of a training session or match, and AI assesses technique (e.g. bandeja, volley, positioning) and adds observations to the session and the Athlete Brief.

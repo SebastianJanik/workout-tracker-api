@@ -6,13 +6,13 @@ allowed-tools: Read, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git 
 
 # review
 
-Review the local changes against [checklist.md](checklist.md). The checklist is the single source of review rules; the future `code-reviewer` subagent (task 5) must read the same file instead of keeping a copy. The checklist is deliberately generic; repo specifics come from `CLAUDE.md` and `docs/`, so it needs no edits when the code changes.
+Review the local changes against [checklist.md](checklist.md). The checklist is the single source of review rules; the future `code-reviewer` subagent (task 5) must read the same file instead of keeping a copy. The checklist is deliberately generic; repo specifics come from `AGENTS.md` and `docs/`, so it needs no edits when the code changes.
 
 ## Steps
 
 1. **Collect the change.** Run `git status --short`, then `git diff HEAD` (staged + unstaged). Read every untracked file listed by `git status` too. If there is nothing, say so and stop.
-2. **Load context only as needed.** Read the `CLAUDE.md` rules that touch the changed paths, any nested `CLAUDE.md` in those directories, and the docs they point to (architecture, ADRs, decision logs) for the areas the diff touches.
-3. **Run the guards** listed in `CLAUDE.md` (tests, static analysis, architecture check, code style, container lint), in the container with `-T`. Report a failing guard as a finding; do not fix it. If Docker is not running, say so instead of skipping silently.
+2. **Load context only as needed.** Read the `AGENTS.md` rules that touch the changed paths, any nested `AGENTS.md` in those directories, and the docs they point to (architecture, ADRs, decision logs) for the areas the diff touches.
+3. **Run the guards** listed in `AGENTS.md` (tests, static analysis, architecture check, code style, container lint), in the container with `-T`. Report a failing guard as a finding; do not fix it. If Docker is not running, say so instead of skipping silently.
 4. **Trace the blast radius.** A line that looks safe in the diff can break code outside it. For every changed or removed symbol (class, method, signature, parameter, return type, constant, enum case, config key, route, message/event shape, DB column, mapping, env var, translation key), search the whole repo with Grep/Glob for its usages, including `src/`, `tests/`, `config/`, `migrations/`, `docs/` and the API contract. Check that each caller, implementer, subclass, test, mapping and consumer still works with the new behaviour. Pay special attention to:
    - changed defaults, nullability, return values, thrown exceptions, ordering or rounding that callers silently relied on;
    - widened or narrowed types, renamed or removed members, and changed interface contracts with other implementations;
@@ -37,7 +37,7 @@ Blast radius: <symbols traced and what was found>
 Verdict: <ready to commit | fix BLOCKER/MAJOR first>
 ```
 
-- BLOCKER: breaks a rule in CLAUDE.md, a layer boundary, correctness, or is an exploitable security issue. Do not commit.
+- BLOCKER: breaks a rule in AGENTS.md, a layer boundary, correctness, or is an exploitable security issue. Do not commit.
 - MAJOR: likely bug, missing test for behaviour, or a pattern/anti-pattern problem.
 - MINOR: naming, style, small simplification.
 - No findings in a severity: omit it. No findings at all: say "No findings" and still print the guards line.
@@ -46,5 +46,4 @@ Verdict: <ready to commit | fix BLOCKER/MAJOR first>
 ## Rules
 
 - Never edit files, commit, or change the contract tests; only report.
-- Explain Symfony concepts you mention with a Laravel analogy, per CLAUDE.md.
-- End by saying what belongs in `docs/agentic-workflow/LOG.md` (task 2, `review` skill: what it caught, what it missed).
+- Explain Symfony concepts you mention with a Laravel analogy, per AGENTS.md.

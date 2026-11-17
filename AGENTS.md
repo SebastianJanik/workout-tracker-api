@@ -1,100 +1,88 @@
 # AGENTS.md
 
-This is a Symfony project. Check `composer.json` for the exact Symfony/PHP version
-in use, and read `symfony.lock` to see which recipes ran. Don't assume Doctrine,
-Twig, API Platform, Messenger, or Lock are installed unless one of those says so.
+Working rules for this repo, for any coding agent or developer. Claude Code reads it through `CLAUDE.md` (`@AGENTS.md`), which adds only Claude-specific extras. Each topic lives in one file:
 
-## Ask before generating
+| Topic | File |
+|---|---|
+| Working rules: environment, commands, architecture, conventions, how to answer | this file |
+| What the product is, goals, requirements, stack, repo layout, Laravel→Symfony cheat sheet | `docs/project/00-project-context.md` (read first) |
+| Domain model, contexts, events | `docs/project/01-domain-model.md` |
+| Design pattern catalogue | `docs/project/02-design-patterns.md` |
+| Agentic tasks 0-7: requirements, DoD, status; ADR list | `docs/project/03-implementation-plan.md` |
+| Analytics decisions | `docs/progress/DECISIONS.md` |
 
-If the task doesn't specify, ask rather than guess:
+This repo is the **backend only**. The mobile app lives in a separate repo, `workout-tracker-mobile` (ADR-012). Currently built: Symfony 8.1 infrastructure (Doctrine, Messenger, Kafka, `GET /api/health`), quality tooling and the pure Progress core for strength. Check `composer.json` and the task statuses in the plan before assuming something exists (no Security, Nelmio or other contexts yet).
 
-- Persistence: Doctrine ORM, Doctrine ODM, or none?
-- Interface: server-rendered (Twig), API (Serializer, maybe API Platform), or both?
-- Auth: SecurityBundle, and which authenticator?
+## Environment: everything runs in Docker
 
-If you can't ask (no interactive channel), state the assumption you're making and
-pick the smallest option (e.g. no persistence layer) rather than scaffolding a
-full stack nobody asked for.
+There is no PHP, Composer or Node on the host. Run every PHP/Composer/console command inside the container, never on the host (ADR-013):
 
-## Adding features: Flex, not hand-wiring
+```
+docker compose up -d                          # app at http://localhost:8000 (FrankenPHP)
+docker compose exec php bin/console ...
+docker compose exec php composer require ...
+docker compose exec -T php ...                # use -T in scripts/hooks (no TTY)
+```
 
-Install new capabilities with `composer require <package>` (e.g. `symfony/lock`,
-`symfony/messenger`, `orm-pack`) and let the Flex recipe register the bundle and
-generate its config. Don't hand-edit `config/bundles.php` or hand-write a bundle's
-base config; that's what the recipe is for. Don't skip a good-fit component just
-because it isn't installed yet; installing it is one command.
+Compose file is `docker-compose.yaml`, image is `Dockerfile` (repo root). `composer.json` has `extra.symfony.docker = false`, so Flex must not generate Docker files.
 
-## Conventions
+Services: `php` (PHP 8.4, `pdo_pgsql intl zip opcache rdkafka`), `postgres` 17 (db/user/password `workout`/`app`/`app`, port 5432), `kafka` (KRaft), `kafka-ui` (:8080), `mailpit` (:8025).
 
-Follow https://symfony.com/doc/current/best_practices.html to write idiomatic
-Symfony:
+Quality tools (run in the container):
 
-- Use PHP attributes for framework metadata, and not only on controllers:
-  `#[Route]`, `#[MapRequestPayload]`, `#[IsGranted]` on actions, `#[Assert\...]`
-  on properties, `#[AsCommand]`, `#[AsEventListener]`, `#[AsMessageHandler]`, and
-  `#[AsAlias]` / `#[AsTaggedItem]` / `#[Autoconfigure]` on services. No YAML or
-  XML routing.
-- Rely on autowiring and autoconfiguration. Type-hint constructor arguments and
-  let the container resolve them. Where a type-hint can't express it, stay in the
-  class with `#[Autowire]` (parameters, env vars, expressions) or `#[Target]` (one
-  of several implementations of an interface). A YAML service definition is the
-  last resort, not the first.
+```
+docker compose exec -T php vendor/bin/phpunit                          # default suite
+docker compose exec -T php vendor/bin/phpunit --testsuite progress-contract
+docker compose exec -T php vendor/bin/phpstan analyse
+docker compose exec -T php vendor/bin/php-cs-fixer fix --dry-run --diff
+docker compose exec -T php vendor/bin/deptrac analyse
+docker compose exec -T php bin/console lint:container
+docker compose exec -T php bin/console doctrine:schema:validate
+docker compose exec -T php bin/console messenger:consume outbox kafka_progress -vv
+docker compose exec -T php bin/console nelmio:apidoc:dump --format=json > docs/api/openapi.json   # once Nelmio is installed
+```
+
+A pre-commit hook in `.githooks/` (`core.hooksPath`) checks for debug dumps and code style. `.env` is committed and holds defaults only; real secrets go in `.env.local` (git-ignored) or the secrets vault, read via `%env(...)%`. When something fails, read `var/log/dev.log` and the web profiler (`/_profiler`) before changing code.
+
+## Architecture
+
+- DDD bounded contexts as sub-namespaces of `App\` (`src/<Context>/{Domain,Application,Infrastructure,Presentation}`): Identity, Coaching, TrainingLibrary, Strength, Padel, Progress, plus SharedKernel (IDs, `Duration`, `Mass`, shared ports, buses, outbox, inbox, Kafka). Strength and Padel sessions are separate models, not one table with a flag. New training types must be addable without modifying existing ones (Open/Closed).
+- The domain layer does not depend on Symfony or Doctrine (PSR interfaces such as `ClockInterface` are fine); Deptrac enforces this. Doctrine mappings are XML, outside the domain.
+- Inside `Domain/` group classes by DDD building block, never flat (under the module folder if there is one). Currently used: `ValueObject/` (incl. enums) and `Service/` (see `src/Progress/Domain/Strength`). Don't create or suggest other folders up front. If a class doesn't fit (first aggregate, repository port, domain event...), propose a new folder named after its DDD building block and ask before adding it.
+- Contexts talk to each other only via integration events (outbox, then Kafka, versioned schemas in `docs/contracts/`, partition key `athleteId`, idempotent inbox consumers keyed by `eventId`) or a context's public facade/query, never through another context's entities or repositories.
+- Messenger has separate `command.bus`, `query.bus` and `event.bus`.
+- One PostgreSQL database, migrations in `migrations/<Context>/` (namespace `DoctrineMigrations\<Context>`, one shared timeline). Each context owns its tables. Cross-context foreign keys are allowed in migrations (DB-level integrity, e.g. `strength_session.athlete_id` to Coaching's athlete table). The code boundary stays strict: no ORM relations across contexts, only plain ID value objects (`AthleteId`), and no JOINs into another context's tables. An FK couples schemas (migration order, test fixtures) and can reject a valid write when the referenced row arrives asynchronously from a Kafka event, so use it only where the referenced row is guaranteed to exist first.
+- `Progress` analytics is a pure core: plain PHP, no I/O, injected time, deterministic.
+- API contract: `docs/api/openapi.json` (exported from Nelmio) must be updated in the same commit as any API change; the mobile repo generates its client from it.
+
+## Symfony conventions
+
+Follow https://symfony.com/doc/current/best_practices.html:
+
+- Use PHP attributes for framework metadata, not only on controllers: `#[Route]`, `#[MapRequestPayload]`, `#[IsGranted]`, `#[Assert\...]`, `#[AsCommand]`, `#[AsEventListener]`, `#[AsMessageHandler]`, and `#[AsAlias]` / `#[AsTaggedItem]` / `#[Autoconfigure]` on services. No YAML or XML routing.
+- Rely on autowiring and autoconfiguration. Where a type-hint can't express it, stay in the class with `#[Autowire]` (parameters, env vars, expressions) or `#[Target]` (one of several implementations). A YAML service definition is the last resort.
 - Controllers extend `AbstractController`, stay thin, and delegate to services.
-- Use the framework for what it already does: Form for server-rendered forms,
-  Validator for validation, Serializer for JSON, Messenger for async work,
-  Security (voters, authenticators) for access control, Twig `path()`/`url()`
-  instead of hardcoded URLs.
-- Before hand-writing infrastructure (locks, queues, caches, HTTP clients,
-  mailers, schedulers) or reaching for a third-party library, check whether a
-  Symfony component covers it. It usually does.
-
-Three specifics worth spelling out, because they are easy to get wrong:
-
-- Bind request data with `#[MapRequestPayload]` / `#[MapQueryString]` on action
-  arguments, which wires up Serializer and Validator for you, instead of calling
-  `json_decode()` or `SerializerInterface` by hand. If neither package is
-  installed yet, `composer require` them rather than falling back to manual
-  parsing.
-- Use constructor property promotion, and `readonly` for DTOs and value objects.
-- Use `symfony/lock` (`LockFactory`) for mutual exclusion. A hand-built flag or
-  lock file looks fine in review and is usually wrong under concurrency.
-
-## Everyday workflow
-
-- Run every PHP, Composer and console command inside the container, never on the
-  host: `docker compose exec php bin/console ...` (add `-T` in scripts and hooks,
-  where there is no TTY).
-- When something fails, read `var/log/dev.log` and the web profiler
-  (`/_profiler`) before changing code.
-- `.env` is committed and holds defaults only. Real secrets belong in `.env.local`
-  (git-ignored) or the secrets vault
-  (`docker compose exec php bin/console secrets:set`), read via `%env(...)%`.
+- Use the framework for what it already does: Validator, Serializer, Messenger, Security (voters, authenticators), Twig `path()`/`url()`. Before hand-writing infrastructure (locks, queues, caches, HTTP clients, mailers, schedulers) check whether a Symfony component covers it, and propose it (see Working rules on packages).
+- Bind request data with `#[MapRequestPayload]` / `#[MapQueryString]`, not by hand with `json_decode()` or `SerializerInterface`.
+- Constructor property promotion; `readonly` for DTOs and value objects.
+- Use `symfony/lock` (`LockFactory`) for mutual exclusion, never a hand-built flag or lock file.
+- When a package is approved, install it with `composer require` and let the Flex recipe register it. Don't hand-edit `config/bundles.php` or hand-write a bundle's base config. Check `git status` afterwards for recipe leftovers (Docker files, `src/Entity`).
+- Code style is the `@Symfony` php-cs-fixer ruleset (config in `.php-cs-fixer.dist.php`).
 
 ## Testing
 
-Install `symfony/test-pack` if it isn't already. Functional/HTTP tests extend
-`WebTestCase`; service-level tests extend `KernelTestCase`. Run
-`php bin/phpunit` (falls back to `vendor/bin/phpunit`). A feature isn't done
-until it has a test that exercises it the way a caller would, an HTTP request for
-a controller or a service call for a service, not just "it didn't throw."
-
-## Code style
-
-Symfony's coding standard, the `@Symfony` php-cs-fixer ruleset (a PSR-12-derived
-superset). Run `vendor/bin/php-cs-fixer fix` if `friendsofphp/php-cs-fixer` is
-installed; it isn't part of the skeleton by default.
+Functional/HTTP tests extend `WebTestCase`; service-level tests extend `KernelTestCase`. A feature isn't done until a test exercises it the way a caller would (an HTTP request for a controller, a service call for a service), not just "it didn't throw." Contract tests in `progress-contract` are never changed to make them pass; a deliberate change is recorded in `docs/progress/DECISIONS.md`.
 
 ## Discover, don't guess
 
-Framework APIs change between versions and your training data may be stale. Look
-things up in the project instead of relying on memory:
+Look things up in the project instead of relying on memory: `bin/console about`, `debug:router`, `debug:container`, `debug:autowiring <name>`, `debug:config <bundle>`, `config:dump-reference <bundle>`, `lint:container`, and the installed source under `vendor/`. Docs: https://symfony.com/doc/current/ (the version in `composer.json`).
 
-- `bin/console about`: versions, environment, paths.
-- `bin/console debug:router`, `debug:container`, `debug:autowiring <name>`,
-  `debug:config <bundle>`, `config:dump-reference <bundle>`: what exists and how
-  it is configured.
-- `bin/console lint:container`, plus `lint:twig templates/` and
-  `lint:yaml config/` where those packages are installed: validate before running.
-- Read the installed source and docblocks under `vendor/`.
-- Docs: https://symfony.com/doc/current/ (switch to the version matching
-  `composer.json` if it differs).
+## Working rules
+
+- Language: code, names, commits, docs and conversation are all in English.
+- Don't add Composer packages without asking.
+- Don't change ADR decisions without discussion; a new decision means a new ADR (`docs/project/03-implementation-plan.md` §5).
+- When unsure about context boundaries, check `docs/project/01-domain-model.md`.
+- If the task doesn't say which persistence, interface or auth to use, the ADRs already decide it (Doctrine ORM, controllers + DTOs, JWT); otherwise ask.
+- The author knows Laravel well and is learning Symfony. Keep answers short and lead with the main point. Explain Symfony concepts with Laravel analogies (cheat sheet in `00-project-context.md` §6) and say where the analogy breaks. Explain a component briefly the first time it is used, with a link to symfony.com docs.
+- Name any design pattern you apply (catalogue in `02-design-patterns.md`), where it lives in the code, and what it teaches.
