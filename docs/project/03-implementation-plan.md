@@ -2,7 +2,7 @@
 
 > Tasks 0–7 map onto the survey (checklist in §4). **The agentic tasks (1–7) take priority**; product features (M1–M7) are the material the agent works on.
 >
-> **This file is the single place for task requirements, definition of done (DoD) and status.** Every task has a `Status` line and a DoD checklist. When a DoD item is met, tick it (`- [x]`); when all are ticked, set the status to ✅ done. Status legend: ✅ done · ⏳ in progress · ☐ not started.
+> **This file is the single place for task requirements, definition of done (DoD) and status.** Every task has a `Status` line and a DoD checklist. When a DoD item is met, tick it (`- [x]`); when all are ticked, set the status to ✅ done. Status legend: ✅ done · 🔎 built, awaiting real-life confirmation (only the "used on real work" DoD items are open) · ⏳ in progress (build work remains) · ☐ not started.
 >
 > This plan covers the **`workout-tracker-api`** repo. Mobile items (screens, TS hooks, mobile rule files) are done in the separate `workout-tracker-mobile` repo and are only mentioned here.
 
@@ -79,7 +79,7 @@ Assumption: about 5 h per week. With a different time budget only the "Product" 
 ### Task 1: rule files (AGENTS.md + CLAUDE.md)
 *Custom rule files tailored to a specific repository*
 
-**Status:** ⏳ in progress (main files written, rules below still missing, nested file not created).
+**Status:** 🔎 built, awaiting real-life confirmation (show a rule changing agent behaviour in 3 cases).
 
 Layout, so that other tools and developers are supported too:
 - `AGENTS.md` holds all tool-neutral rules (the cross-tool convention). Each topic lives in exactly one file, and its header table says which.
@@ -92,16 +92,16 @@ Required content of `AGENTS.md`:
 - [x] Architecture: contexts, layers, XML mapping outside the domain, cross-context communication only via events or a facade, Deptrac as the guard
 - [x] Pure core: Progress Analytics without framework or I/O, injected time
 - [x] Core rules: contract tests are never changed to pass; a deliberate analytics change is recorded in `docs/progress/DECISIONS.md`
-- [ ] Messenger/Kafka: messages are immutable DTOs with primitives, integration events only through the outbox, every new message type has routing, retry and a test on `in-memory://` (bus separation, partition key and inbox are already rules)
-- [ ] Conventions: `declare(strict_types=1)`, `final`, named constructors, domain exceptions instead of null, controllers only delegate (`readonly` DTOs and thin controllers are already rules)
-- [ ] Patterns: every new feature names the patterns it uses in the PR description (naming them in answers is already a rule)
-- [ ] Workflow: TDD; after a change run the affected context's tests
-- [ ] Prohibitions: don't edit released migrations, don't touch `.env.local`, don't delete topics or Docker volumes, don't reset consumer group offsets; when in doubt, ask (no packages without asking, no host PHP and no changing contract tests are already rules)
+- [x] Messenger/Kafka: messages are immutable DTOs with primitives, integration events only through the outbox, every new message type has routing, retry and a test on `in-memory://` (bus separation, partition key and inbox are already rules)
+- [x] Conventions: `declare(strict_types=1)`, `final`, named constructors, domain exceptions instead of null, controllers only delegate (`readonly` DTOs and thin controllers are already rules)
+- [x] Patterns: every new feature names the patterns it uses in the PR description (naming them in answers is already a rule)
+- [x] Workflow: TDD; after a change run the affected context's tests
+- [x] Prohibitions: don't edit released migrations, don't touch `.env.local`, don't delete topics or Docker volumes, don't reset consumer group offsets; when in doubt, ask (no packages without asking, no host PHP and no changing contract tests are already rules)
 
 **DoD:**
-- [ ] all required content above is in `AGENTS.md`
-- [ ] nested `src/Progress/Domain/Strength/AGENTS.md` (purity, determinism, `StrengthReport` format) plus its one-line `CLAUDE.md` committed
-- [ ] `AGENTS.md` stays around 150 lines
+- [x] all required content above is in `AGENTS.md`
+- [x] nested `src/Progress/Domain/Strength/AGENTS.md` (purity, determinism, `StrengthReport` format) plus its one-line `CLAUDE.md` committed
+- [x] `AGENTS.md` stays around 150 lines
 - [ ] a rule is shown to change the agent's behaviour in at least 3 cases (say so in the commit message)
 
 The mobile rule files are created in the mobile repo.
@@ -109,7 +109,7 @@ The mobile rule files are created in the mobile repo.
 ### Task 2: a skill
 *Custom slash commands or reusable prompts/skills*
 
-**Status:** ⏳ in progress (skill built, real usage still to be shown).
+**Status:** 🔎 built, awaiting real-life confirmation (use the skill on 3 real changes).
 
 Skills are shared across tools: they live in `.agents/skills/` (the cross-tool location) and `.claude/skills` is a symlink to it, because Claude Code reads only `.claude/skills/`. Claude-only frontmatter such as `allowed-tools` is ignored by other tools. One skill is enough for the survey item ("commands / skills"): **`review`** in `.agents/skills/review/SKILL.md` (frontmatter `name`, `description`). It reviews the current `git diff` against the `code-reviewer` checklist in task 5 (single source: the skill and the subagent share it, no second copy), plus a class-in-the-right-`Domain/`-folder check.
 

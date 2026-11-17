@@ -13,6 +13,13 @@ Working rules for this repo, for any coding agent or developer. Claude Code read
 
 This repo is the **backend only**. The mobile app lives in a separate repo, `workout-tracker-mobile` (ADR-012). Currently built: Symfony 8.1 infrastructure (Doctrine, Messenger, Kafka, `GET /api/health`), quality tooling and the pure Progress core for strength. Check `composer.json` and the task statuses in the plan before assuming something exists (no Security, Nelmio or other contexts yet).
 
+## Nested rule files
+
+- **Reading:** before editing code in a directory, check whether it (or a parent) has an `AGENTS.md` and follow it. Nested rules add to this file and never override it. Claude Code loads a nested file only through its `CLAUDE.md`.
+- **Creating:** add one only when a directory has rules that apply nowhere else and a mistake there would be costly (e.g. `src/Progress/Domain/Strength/`). Not one per folder.
+- **Writing:** each topic lives in exactly one file. Never restate a root rule; link to it in one line at most. Keep it short (about 10 lines) and concrete.
+- **Wiring:** the rules go in `<dir>/AGENTS.md`, and `<dir>/CLAUDE.md` contains only `@AGENTS.md`.
+
 ## Environment: everything runs in Docker
 
 There is no PHP, Composer or Node on the host. Run every PHP/Composer/console command inside the container, never on the host (ADR-013):
@@ -51,6 +58,8 @@ A pre-commit hook in `.githooks/` (`core.hooksPath`) checks for debug dumps and 
 - Inside `Domain/` group classes by DDD building block, never flat (under the module folder if there is one). Currently used: `ValueObject/` (incl. enums) and `Service/` (see `src/Progress/Domain/Strength`). Don't create or suggest other folders up front. If a class doesn't fit (first aggregate, repository port, domain event...), propose a new folder named after its DDD building block and ask before adding it.
 - Contexts talk to each other only via integration events (outbox, then Kafka, versioned schemas in `docs/contracts/`, partition key `athleteId`, idempotent inbox consumers keyed by `eventId`) or a context's public facade/query, never through another context's entities or repositories.
 - Messenger has separate `command.bus`, `query.bus` and `event.bus`.
+- Messages (commands, queries, events) are immutable `final readonly` DTOs holding primitives only (no entities, no objects with behaviour), so they serialize safely.
+- Integration events are published only through the outbox, never dispatched straight to Kafka. Every new message type gets routing in `config/packages/messenger.yaml`, a retry/failure decision, and a test on `in-memory://`.
 - One PostgreSQL database, migrations in `migrations/<Context>/` (namespace `DoctrineMigrations\<Context>`, one shared timeline). Each context owns its tables. Cross-context foreign keys are allowed in migrations (DB-level integrity, e.g. `strength_session.athlete_id` to Coaching's athlete table). The code boundary stays strict: no ORM relations across contexts, only plain ID value objects (`AthleteId`), and no JOINs into another context's tables. An FK couples schemas (migration order, test fixtures) and can reject a valid write when the referenced row arrives asynchronously from a Kafka event, so use it only where the referenced row is guaranteed to exist first.
 - `Progress` analytics is a pure core: plain PHP, no I/O, injected time, deterministic.
 - API contract: `docs/api/openapi.json` (exported from Nelmio) must be updated in the same commit as any API change; the mobile repo generates its client from it.
@@ -68,10 +77,16 @@ Follow https://symfony.com/doc/current/best_practices.html:
 - Use `symfony/lock` (`LockFactory`) for mutual exclusion, never a hand-built flag or lock file.
 - When a package is approved, install it with `composer require` and let the Flex recipe register it. Don't hand-edit `config/bundles.php` or hand-write a bundle's base config. Check `git status` afterwards for recipe leftovers (Docker files, `src/Entity`).
 - Code style is the `@Symfony` php-cs-fixer ruleset (config in `.php-cs-fixer.dist.php`).
+- Every PHP file starts with `declare(strict_types=1);`. Classes are `final` unless designed for extension.
+- Value objects and aggregates are built through named constructors (`Mass::fromKilograms()`), not public constructors with loose primitives.
+- Domain code throws domain exceptions for invalid states and missing things; it doesn't return `null` to signal failure.
+- Controllers only map the request to a message/DTO, dispatch, and map the result back. No business logic.
 
 ## Testing
 
 Functional/HTTP tests extend `WebTestCase`; service-level tests extend `KernelTestCase`. A feature isn't done until a test exercises it the way a caller would (an HTTP request for a controller, a service call for a service), not just "it didn't throw." Contract tests in `progress-contract` are never changed to make them pass; a deliberate change is recorded in `docs/progress/DECISIONS.md`.
+
+Workflow: write the failing test first (TDD), then the code. After every change run the tests of the affected context (e.g. `vendor/bin/phpunit --filter Progress`), and the full set of quality tools before finishing.
 
 ## Discover, don't guess
 
@@ -81,6 +96,11 @@ Look things up in the project instead of relying on memory: `bin/console about`,
 
 - Language: code, names, commits, docs and conversation are all in English.
 - Don't add Composer packages without asking.
+- Never edit a migration that has been released (committed to `main`); add a new one.
+- Never read or modify `.env.local`.
+- Never delete Kafka topics or Docker volumes, and never reset consumer group offsets. Destructive operations on shared state need explicit approval.
+- When in doubt about any of the above, ask.
+- Every new feature names the design patterns it uses (see `02-design-patterns.md`) in the PR description.
 - Don't change ADR decisions without discussion; a new decision means a new ADR (`docs/project/03-implementation-plan.md` §5).
 - When unsure about context boundaries, check `docs/project/01-domain-model.md`.
 - If the task doesn't say which persistence, interface or auth to use, the ADRs already decide it (Doctrine ORM, controllers + DTOs, JWT); otherwise ask.
