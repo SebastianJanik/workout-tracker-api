@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same image and commands as local development (ADR-013). Kafka is not started:
+      # tests use in-memory:// transports (see AGENTS.md, Messenger/Kafka).
+      - name: Build and start php + postgres
+        run: |
+          docker compose build php
+          docker compose up -d --no-deps php postgres
+
+      - name: Install dependencies
+        run: docker compose exec -T php composer install --no-interaction --prefer-dist
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            docker compose exec -T postgres pg_isready -U app -d workout && exit 0
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready" >&2; exit 1
+
+      - name: Code style (php-cs-fixer)
+        run: docker compose exec -T php vendor/bin/php-cs-fixer fix --dry-run --diff
+
+      - name: Static analysis (PHPStan)
+        run: docker compose exec -T php vendor/bin/phpstan analyse --no-progress
+
+      - name: Architecture (Deptrac)
+        run: docker compose exec -T php vendor/bin/deptrac analyse --no-progress
+
+      - name: Container lint
+        run: docker compose exec -T php bin/console lint:container
+
+      - name: Migrations and schema validation
+        run: |
+          docker compose exec -T php bin/console doctrine:migrations:migrate --no-interaction
+          docker compose exec -T php bin/console doctrine:schema:validate
+
+      # No --testsuite: PHPUnit runs every suite in phpunit.dist.xml, contract tests included.
+      - name: Tests
+        run: docker compose exec -T php vendor/bin/phpunit
+
+      # Skipped until Nelmio is installed (docs/api/openapi.json does not exist yet).
+      - name: OpenAPI export is up to date
+        run: |
+          if [ ! -f docs/api/openapi.json ]; then
+            echo "docs/api/openapi.json not present yet, skipping"; exit 0
+          fi
+          docker compose exec -T php bin/console nelmio:apidoc:dump --format=json > /tmp/openapi.json
+          diff -u docs/api/openapi.json /tmp/openapi.json \
+            || { echo "docs/api/openapi.json is stale: re-export it (see AGENTS.md)" >&2; exit 1; }

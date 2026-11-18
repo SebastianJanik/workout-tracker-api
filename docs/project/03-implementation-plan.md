@@ -265,7 +265,7 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 ### Task 7: a consistent workflow
 *A defined personal workflow applied consistently*
 
-**Status:** ☐ not started.
+**Status:** 🔎 built, awaiting real-life confirmation (take 5 real tasks through it; CI has not run on GitHub yet).
 
 `docs/agentic-workflow/WORKFLOW.md`:
 1. **Spec**: `docs/specs/NNN-name.md`. Contains the goal, acceptance criteria, out of scope, risks, affected contexts, **patterns used**, impact on the event contract (Published Language), impact on the mobile API (`openapi.json`) and on the Athlete Brief.
@@ -277,7 +277,7 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 7. **Retro**: an agent mistake becomes a rule in `AGENTS.md` (or `CLAUDE.md` if Claude-only) or a fix to a command or hook.
 
 **DoD:**
-- [ ] WORKFLOW.md, a spec template and CI in the repo
+- [x] WORKFLOW.md, a spec template and CI in the repo
 - [ ] at least 5 tasks taken through the full workflow
 - [ ] at least 2 rule-file changes (`AGENTS.md` / `CLAUDE.md`) resulting from retros
 
