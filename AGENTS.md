@@ -31,6 +31,8 @@ docker compose exec php composer require ...
 docker compose exec -T php ...                # use -T in scripts/hooks (no TTY)
 ```
 
+The one host requirement besides Docker and git is `python3` (preinstalled on macOS with the Xcode Command Line Tools): the Claude Code hook in `.claude/hooks/` runs on the host and uses it to read the tool call JSON.
+
 Compose file is `docker-compose.yaml`, image is `Dockerfile` (repo root). `composer.json` has `extra.symfony.docker = false`, so Flex must not generate Docker files.
 
 Services: `php` (PHP 8.4, `pdo_pgsql intl zip opcache rdkafka`), `postgres` 17 (db/user/password `workout`/`app`/`app`, port 5432), `kafka` (KRaft), `kafka-ui` (:8080), `mailpit` (:8025).
@@ -49,7 +51,7 @@ docker compose exec -T php bin/console messenger:consume outbox kafka_progress -
 docker compose exec -T php bin/console nelmio:apidoc:dump --format=json > docs/api/openapi.json   # once Nelmio is installed
 ```
 
-A pre-commit hook in `.githooks/` (`core.hooksPath`) checks for debug dumps and code style. `.env` is committed and holds defaults only; real secrets go in `.env.local` (git-ignored) or the secrets vault, read via `%env(...)%`. When something fails, read `var/log/dev.log` and the web profiler (`/_profiler`) before changing code.
+A pre-commit hook in `.githooks/` (`core.hooksPath`) checks staged files for debug dumps, then runs php-cs-fixer, PHPStan and Deptrac on staged PHP files. Quality checks run only at commit time, not after every agent edit. `.env` is committed and holds defaults only; real secrets go in `.env.local` (git-ignored) or the secrets vault, read via `%env(...)%`. When something fails, read `var/log/dev.log` and the web profiler (`/_profiler`) before changing code.
 
 ## Architecture
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pre-commit: (1) no debug dumps in added lines, (2) PHP-CS-Fixer on staged PHP files.
+# Pre-commit: (1) no debug dumps in added lines, (2) php-cs-fixer, PHPStan and Deptrac on staged PHP files.
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(php|twig)$')
@@ -14,16 +14,24 @@ if [ -n "$DUMPS" ]; then
   exit 1
 fi
 
-# 2. Code style (runs in Docker, see CLAUDE.md)
+# 2. Style, PHPStan, Deptrac (run in Docker, see AGENTS.md)
 PHP_FILES=$(echo "$FILES" | grep '\.php$')
 [ -z "$PHP_FILES" ] && exit 0
 if ! docker compose exec -T php true >/dev/null 2>&1; then
   echo "pre-commit: php container is not running (docker compose up -d)." >&2
   exit 1
 fi
-if ! echo "$PHP_FILES" | xargs docker compose exec -T php vendor/bin/php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php --path-mode=intersection --; then
-  echo >&2
-  echo "pre-commit: code style violations. Fix with:" >&2
-  echo "  docker compose exec -T php vendor/bin/php-cs-fixer fix   # then re-stage (git add)" >&2
-  exit 1
-fi
+PHP="docker compose exec -T php"
+
+# shellcheck disable=SC2086
+OUT=$($PHP vendor/bin/php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.dist.php --path-mode=intersection -- $PHP_FILES 2>&1) || {
+  echo "pre-commit: code style violations:" >&2; echo "$OUT" >&2
+  echo "Fix with: docker compose exec -T php vendor/bin/php-cs-fixer fix   (then git add)" >&2; exit 1; }
+
+# shellcheck disable=SC2086
+OUT=$($PHP vendor/bin/phpstan analyse --no-progress --error-format=raw $PHP_FILES 2>&1) || {
+  echo "pre-commit: PHPStan errors:" >&2; echo "$OUT" >&2; exit 1; }
+
+# Deptrac checks layer rules across files, so it runs on the whole project.
+OUT=$($PHP vendor/bin/deptrac analyse --no-progress 2>&1) || {
+  echo "pre-commit: Deptrac violations:" >&2; echo "$OUT" >&2; exit 1; }

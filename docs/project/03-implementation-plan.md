@@ -122,19 +122,19 @@ More skills or commands are added only when a task repeats often enough to need 
 ### Task 3: hooks and automation
 *Hooks or automation that run on agent actions*
 
-**Status:** ☐ not started.
+**Status:** 🔎 built, awaiting real-life confirmation (check `/hooks`, then wait for a real pre-commit fix and a real block).
 
 Hooks run **on the host**, so they call PHP tools through `docker compose exec -T php …`.
 
-Two hooks, the two with the most value (more can be added later when a real mistake needs one):
-1. **PostToolUse** (`Edit|Write`) → `php-quality.sh`: for `*.php` runs php-cs-fixer on the file, PHPStan on the file, Deptrac. An error ends with `exit 2` and a description on stderr, which goes back to the agent, so it fixes its own mistakes.
-2. **PreToolUse** (`Bash`) → `block-dangerous.sh`: blocks destructive commands (`doctrine:schema:drop`, `doctrine:database:drop`, `docker compose down -v`, `docker volume rm`, `rm -rf`, `kafka-topics … --delete`, `kafka-consumer-groups … --reset-offsets|--delete`), reading `.env.local`, and running `php`/`composer` directly on the host.
+One Claude hook (more can be added later when a real mistake needs one). Quality checks (php-cs-fixer, PHPStan, Deptrac) are deliberately *not* a PostToolUse hook: they run only at commit time in the git pre-commit hook (`.githooks/pre-commit`), so the agent can leave debug code and half-finished edits while working.
 
-Registered in `.claude/settings.json` (scripts `chmod +x`, verify via `/hooks`). The mobile equivalent of `php-quality.sh` (eslint + tsc) will be created in the mobile repo.
+**PreToolUse** (`Bash`) → `block-dangerous.sh`: blocks destructive commands (`doctrine:schema:drop`, `doctrine:database:drop`, `docker compose down -v`, `docker volume rm`, `rm -rf`, `kafka-topics … --delete`, `kafka-consumer-groups … --reset-offsets|--delete`), reading `.env.local`, and running `php`/`composer` directly on the host.
+
+Registered in `.claude/settings.json` (script `chmod +x`, verify via `/hooks`). The mobile equivalent of the pre-commit quality checks (eslint + tsc) will be created in the mobile repo.
 
 **DoD:**
-- [ ] both hooks registered in `.claude/settings.json` and visible in `/hooks`
-- [ ] the agent fixed a hook error by itself (PHPStan or Deptrac)
+- [ ] the hook is registered in `.claude/settings.json` and visible in `/hooks`
+- [ ] the agent fixed a pre-commit failure by itself (PHPStan or Deptrac)
 - [ ] a hook blocked a dangerous command
 
 ### Task 4: custom MCP server over Kafka and Messenger
