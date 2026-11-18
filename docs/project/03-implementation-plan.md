@@ -122,7 +122,7 @@ More skills or commands are added only when a task repeats often enough to need 
 ### Task 3: hooks and automation
 *Hooks or automation that run on agent actions*
 
-**Status:** 🔎 built, awaiting real-life confirmation (check `/hooks`, then wait for a real pre-commit fix and a real block).
+**Status:** 🔎 built, awaiting real-life confirmation (check `/hooks`, then wait for a real pre-commit fix).
 
 Hooks run **on the host**, so they call PHP tools through `docker compose exec -T php …`.
 
@@ -135,7 +135,7 @@ Registered in `.claude/settings.json` (script `chmod +x`, verify via `/hooks`). 
 **DoD:**
 - [ ] the hook is registered in `.claude/settings.json` and visible in `/hooks`
 - [ ] the agent fixed a pre-commit failure by itself (PHPStan or Deptrac)
-- [ ] a hook blocked a dangerous command
+- [x] a hook blocked a dangerous command (2026-11-18: a Docker volume removal, plus an accidental block of a commit message mentioning the secrets file)
 
 ### Task 4: custom MCP server over Kafka and Messenger
 *A custom MCP server connecting the agent to an internal system*
