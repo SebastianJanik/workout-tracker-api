@@ -265,7 +265,7 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 ### Task 7: a consistent workflow
 *A defined personal workflow applied consistently*
 
-**Status:** 🔎 built, awaiting real-life confirmation (take 5 real tasks through it; CI has not run on GitHub yet).
+**Status:** 🔎 built, awaiting real-life confirmation (take 5 real tasks through it; CI ran green on GitHub).
 
 `docs/agentic-workflow/WORKFLOW.md`:
 1. **Spec**: `docs/specs/NNN-name.md`. Contains the goal, acceptance criteria, out of scope, risks, affected contexts, **patterns used**, impact on the event contract (Published Language), impact on the mobile API (`openapi.json`) and on the Athlete Brief.
