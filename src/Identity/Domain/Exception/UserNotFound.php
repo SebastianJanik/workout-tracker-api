@@ -6,11 +6,12 @@ namespace App\Identity\Domain\Exception;
 
 use App\Identity\Domain\ValueObject\Email;
 use App\SharedKernel\Domain\Exception\NotFound;
+use App\SharedKernel\Domain\Exception\TranslatableDomainException;
 
-final class UserNotFound extends \DomainException implements NotFound
+final class UserNotFound extends TranslatableDomainException implements NotFound
 {
     public static function withEmail(Email $email): self
     {
-        return new self(sprintf('No user with email "%s".', $email->value()));
+        return new self('identity.user.not_found', ['%email%' => $email->value()]);
     }
 }

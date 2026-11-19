@@ -85,6 +85,14 @@ Follow https://symfony.com/doc/current/best_practices.html:
 - A domain exception gets its HTTP meaning by implementing a marker from `App\SharedKernel\Domain\Exception`: `Conflict` (409), `NotFound` (404), `InvalidInput` (422). `DomainExceptionListener` maps them for the whole app. Never list exceptions one by one in `framework.yaml`, and never make a domain exception extend an `HttpException`. A new status means a new marker plus one line in the listener. An exception with no marker stays a 500.
 - Controllers only map the request to a message/DTO, dispatch, and map the result back. No business logic.
 
+## User-facing text and translations
+
+- User-facing text (error messages, validation messages, anything the API returns for a person to read) is never a literal in PHP. Code holds keys, files hold text.
+- Log messages and developer-facing text stay in English and are never translated.
+- Each bounded context keeps its translation files in `src/<Context>/translations/`, one file per locale (`<context>.<locale>.yaml`, translation domain = the context), the same keys in every enabled locale (`en`, `pl`). Register the directory in the context's bundle (`prependExtension()`), as with Doctrine.
+- A domain exception that maps to HTTP extends `TranslatableDomainException` and is built with a key (`'identity.email.invalid'`, parameters as `%name%` placeholders), never free text. A test fails if it doesn't.
+- Every error body is built by `ApiErrorFactory`; no other code assembles one. Custom validator constraints use keys for their messages too.
+
 ## Testing
 
 Functional/HTTP tests extend `WebTestCase`; service-level tests extend `KernelTestCase`. A feature isn't done until a test exercises it the way a caller would (an HTTP request for a controller, a service call for a service), not just "it didn't throw." Contract tests in `progress-contract` are never changed to make them pass; a deliberate change is recorded in `docs/progress/DECISIONS.md`.

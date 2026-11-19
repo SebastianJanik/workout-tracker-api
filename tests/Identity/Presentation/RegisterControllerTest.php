@@ -39,7 +39,7 @@ final class RegisterControllerTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(422);
         self::assertIsArray($data['violations'] ?? null);
-        $fields = array_column($data['violations'], 'propertyPath');
+        $fields = array_column($data['violations'], 'field');
         sort($fields);
         self::assertSame(['email', 'password'], $fields);
     }

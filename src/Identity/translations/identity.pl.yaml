@@ -1,0 +1,5 @@
+email:
+    already_registered: 'Użytkownik z adresem e-mail "%email%" jest już zarejestrowany.'
+    invalid: '"%email%" nie jest prawidłowym adresem e-mail.'
+user:
+    not_found: 'Nie znaleziono użytkownika z adresem e-mail "%email%".'

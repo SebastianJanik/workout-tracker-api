@@ -7,6 +7,7 @@ namespace App\Tests\SharedKernel\Presentation;
 use App\SharedKernel\Domain\Exception\Conflict;
 use App\SharedKernel\Domain\Exception\InvalidInput;
 use App\SharedKernel\Domain\Exception\NotFound;
+use App\SharedKernel\Domain\Exception\TranslatableDomainException;
 use App\SharedKernel\Presentation\DomainExceptionListener;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -25,14 +26,15 @@ final class DomainExceptionListenerTest extends TestCase
     #[DataProvider('markers')]
     public function testMapsAMarkedDomainExceptionToItsHttpStatus(string $exceptionClass, int $status): void
     {
-        $event = $this->eventFor(new $exceptionClass('boom'));
+        $event = $this->eventFor(new $exceptionClass('shared.boom'));
 
         (new DomainExceptionListener())($event);
 
         $mapped = $event->getThrowable();
         self::assertInstanceOf(HttpExceptionInterface::class, $mapped);
         self::assertSame($status, $mapped->getStatusCode());
-        self::assertSame('boom', $mapped->getMessage());
+        self::assertSame('shared.boom', $mapped->getMessage());
+        self::assertInstanceOf($exceptionClass, $mapped->getPrevious());
     }
 
     /** @return iterable<string, array{class-string<\Throwable>, int}> */
@@ -45,7 +47,7 @@ final class DomainExceptionListenerTest extends TestCase
 
     public function testUnwrapsAMessengerFailureBeforeMapping(): void
     {
-        $event = $this->eventFor(new HandlerFailedException(new Envelope(new \stdClass()), [new ConflictStub('taken')]));
+        $event = $this->eventFor(new HandlerFailedException(new Envelope(new \stdClass()), [new ConflictStub('shared.taken')]));
 
         (new DomainExceptionListener())($event);
 
@@ -80,14 +82,14 @@ final class DomainExceptionListenerTest extends TestCase
     }
 }
 
-final class ConflictStub extends \DomainException implements Conflict
+final class ConflictStub extends TranslatableDomainException implements Conflict
 {
 }
 
-final class NotFoundStub extends \DomainException implements NotFound
+final class NotFoundStub extends TranslatableDomainException implements NotFound
 {
 }
 
-final class InvalidInputStub extends \DomainException implements InvalidInput
+final class InvalidInputStub extends TranslatableDomainException implements InvalidInput
 {
 }

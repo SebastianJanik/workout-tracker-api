@@ -13,6 +13,22 @@
                 ],
                 "summary": "Exchange a refresh token for a new JWT (the refresh token is single-use and is replaced).",
                 "operationId": "refreshToken",
+                "parameters": [
+                    {
+                        "name": "Accept-Language",
+                        "in": "header",
+                        "description": "Language of error messages, `en` (default) or `pl`. Any other value falls back to `en`.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "en",
+                            "enum": [
+                                "en",
+                                "pl"
+                            ]
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -55,7 +71,7 @@
                         }
                     },
                     "401": {
-                        "description": "Unknown, expired or already used refresh token."
+                        "$ref": "#/components/responses/Unauthorized"
                     }
                 },
                 "security": []
@@ -68,6 +84,22 @@
                 ],
                 "summary": "The authenticated user",
                 "operationId": "me",
+                "parameters": [
+                    {
+                        "name": "Accept-Language",
+                        "in": "header",
+                        "description": "Language of error messages, `en` (default) or `pl`. Any other value falls back to `en`.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "en",
+                            "enum": [
+                                "en",
+                                "pl"
+                            ]
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "The current user.",
@@ -94,7 +126,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing, invalid or expired JWT."
+                        "$ref": "#/components/responses/Unauthorized"
                     }
                 }
             }
@@ -106,6 +138,22 @@
                 ],
                 "summary": "Log in with email and password",
                 "operationId": "login",
+                "parameters": [
+                    {
+                        "name": "Accept-Language",
+                        "in": "header",
+                        "description": "Language of error messages, `en` (default) or `pl`. Any other value falls back to `en`.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "en",
+                            "enum": [
+                                "en",
+                                "pl"
+                            ]
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -144,7 +192,7 @@
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials."
+                        "$ref": "#/components/responses/Unauthorized"
                     }
                 },
                 "security": []
@@ -157,6 +205,22 @@
                 ],
                 "summary": "Create an account",
                 "operationId": "register",
+                "parameters": [
+                    {
+                        "name": "Accept-Language",
+                        "in": "header",
+                        "description": "Language of error messages, `en` (default) or `pl`. Any other value falls back to `en`.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "en",
+                            "enum": [
+                                "en",
+                                "pl"
+                            ]
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -193,10 +257,10 @@
                         }
                     },
                     "409": {
-                        "description": "The email is already registered."
+                        "$ref": "#/components/responses/Conflict"
                     },
                     "422": {
-                        "description": "Invalid email or password (violations per field)."
+                        "$ref": "#/components/responses/ValidationFailed"
                     }
                 },
                 "security": []
@@ -209,6 +273,22 @@
                 ],
                 "summary": "Liveness check",
                 "operationId": "health",
+                "parameters": [
+                    {
+                        "name": "Accept-Language",
+                        "in": "header",
+                        "description": "Language of error messages, `en` (default) or `pl`. Any other value falls back to `en`.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "en",
+                            "enum": [
+                                "en",
+                                "pl"
+                            ]
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "The app is up.",
@@ -236,6 +316,68 @@
     },
     "components": {
         "schemas": {
+            "Error": {
+                "description": "Every error response has this shape (RFC 9457 problem details). `title` and `detail` are translated into the requested language; show them, do not parse them.",
+                "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "example": "about:blank"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Conflict"
+                    },
+                    "status": {
+                        "type": "integer",
+                        "example": 409
+                    },
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationError": {
+                "description": "An `Error` with one violation per invalid field (status 422).",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                        "required": [
+                            "violations"
+                        ],
+                        "properties": {
+                            "violations": {
+                                "type": "array",
+                                "items": {
+                                    "required": [
+                                        "field",
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "field": {
+                                            "type": "string",
+                                            "example": "email"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
             "RegisterRequest": {
                 "properties": {
                     "email": {
@@ -251,6 +393,38 @@
                     }
                 },
                 "type": "object"
+            }
+        },
+        "responses": {
+            "Unauthorized": {
+                "description": "Missing, invalid or expired credentials.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Error"
+                        }
+                    }
+                }
+            },
+            "Conflict": {
+                "description": "The request conflicts with the current state.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Error"
+                        }
+                    }
+                }
+            },
+            "ValidationFailed": {
+                "description": "The submitted data is invalid (violations per field).",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        }
+                    }
+                }
             }
         },
         "securitySchemes": {

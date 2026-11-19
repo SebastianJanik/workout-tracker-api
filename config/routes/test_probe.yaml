@@ -1,0 +1,5 @@
+# Test-only error probes (see tests/Support/ErrorProbeController.php).
+when@test:
+    test_probe:
+        resource: ../../tests/Support/ErrorProbeController.php
+        type: attribute

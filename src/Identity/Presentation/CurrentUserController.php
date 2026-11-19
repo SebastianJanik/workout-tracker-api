@@ -31,7 +31,7 @@ final class CurrentUserController extends AbstractController
         required: ['id', 'email'],
         properties: [new OA\Property('id', type: 'string', format: 'uuid'), new OA\Property('email', type: 'string', format: 'email')],
     ))]
-    #[OA\Response(response: 401, description: 'Missing, invalid or expired JWT.')]
+    #[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
     public function __invoke(#[CurrentUser] UserInterface $user): JsonResponse
     {
         /** @var UserProfile $profile */

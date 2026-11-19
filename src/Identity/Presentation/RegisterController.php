@@ -32,8 +32,8 @@ final class RegisterController extends AbstractController
         required: ['id', 'email'],
         properties: [new OA\Property('id', type: 'string', format: 'uuid'), new OA\Property('email', type: 'string', format: 'email')],
     ))]
-    #[OA\Response(response: 409, description: 'The email is already registered.')]
-    #[OA\Response(response: 422, description: 'Invalid email or password (violations per field).')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function __invoke(#[MapRequestPayload] RegisterRequest $request): JsonResponse
     {
         /** @var RegisteredUser $user */

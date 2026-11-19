@@ -5,6 +5,47 @@ nelmio_api_doc:
             description: Backend API for the Workout Tracker mobile app.
             version: 1.0.0
         components:
+            schemas:
+                Error:
+                    type: object
+                    description: Every error response has this shape (RFC 9457 problem details). `title` and `detail` are translated into the requested language; show them, do not parse them.
+                    required: [type, title, status, detail]
+                    properties:
+                        type: { type: string, example: 'about:blank' }
+                        title: { type: string, example: Conflict }
+                        status: { type: integer, example: 409 }
+                        detail: { type: string }
+                ValidationError:
+                    description: An `Error` with one violation per invalid field (status 422).
+                    allOf:
+                        - $ref: '#/components/schemas/Error'
+                        - type: object
+                          required: [violations]
+                          properties:
+                              violations:
+                                  type: array
+                                  items:
+                                      type: object
+                                      required: [field, message]
+                                      properties:
+                                          field: { type: string, example: email }
+                                          message: { type: string }
+            responses:
+                Unauthorized:
+                    description: Missing, invalid or expired credentials.
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Error' }
+                Conflict:
+                    description: The request conflicts with the current state.
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/Error' }
+                ValidationFailed:
+                    description: The submitted data is invalid (violations per field).
+                    content:
+                        application/json:
+                            schema: { $ref: '#/components/schemas/ValidationError' }
             securitySchemes:
                 Bearer:
                     type: http
@@ -42,7 +83,7 @@ nelmio_api_doc:
                                             token: { type: string }
                                             refresh_token: { type: string }
                         '401':
-                            description: Unknown, expired or already used refresh token.
+                            $ref: '#/components/responses/Unauthorized'
     areas: # to filter documented areas
         path_patterns:
             - ^/api(?!/doc$) # Accepts routes under /api except /api/doc.json

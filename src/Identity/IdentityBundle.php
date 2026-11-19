@@ -17,6 +17,11 @@ final class IdentityBundle extends AbstractBundle
 {
     public function prependExtension(ContainerConfigurator $container, ContainerBuilder $builder): void
     {
+        // Translation files live with the context; the translation domain is the context name.
+        $container->extension('framework', [
+            'translator' => ['paths' => [__DIR__.'/translations']],
+        ]);
+
         $container->extension('doctrine', [
             'dbal' => [
                 // DBAL types are global by design; the context that owns the aggregate registers its id type.
