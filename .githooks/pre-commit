@@ -1,6 +1,18 @@
 #!/bin/sh
-# Pre-commit: (1) no debug dumps in added lines, (2) php-cs-fixer, PHPStan and Deptrac on staged PHP files.
+# Pre-commit: (0) no secrets or key files, (1) no debug dumps in added lines, (2) php-cs-fixer, PHPStan and Deptrac on staged PHP files.
 cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# 0. Secrets: never commit key files, local env files or private-key material (runs on every commit).
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+KEY_FILES=$(echo "$STAGED" | grep -E '\.(pem|key|p12|pfx)$|(^|/)\.env\.([^/]*\.)?local$|(^|/)id_(rsa|ed25519|ecdsa)$')
+KEY_BODIES=$(git diff --cached -U0 --diff-filter=ACMR | grep -E '^\+[^+]' | grep -E -e '-----BEGIN [A-Z ]*PRIVATE[ ]KEY-----')
+if [ -n "$KEY_FILES" ] || [ -n "$KEY_BODIES" ]; then
+  echo "pre-commit: secrets in staged changes (JWT keys, local env files, private keys). Never commit these:" >&2
+  [ -n "$KEY_FILES" ] && echo "$KEY_FILES" >&2
+  [ -n "$KEY_BODIES" ] && echo "(private key material found in added lines)" >&2
+  echo "Unstage with: git restore --staged <file>. JWT keys live in config/jwt/ (git-ignored); the passphrase goes in the git-ignored local env file." >&2
+  exit 1
+fi
 
 FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(php|twig)$')
 [ -z "$FILES" ] && exit 0

@@ -51,7 +51,7 @@ docker compose exec -T php bin/console messenger:consume outbox kafka_progress -
 docker compose exec -T php bin/console nelmio:apidoc:dump --format=json > docs/api/openapi.json   # once Nelmio is installed
 ```
 
-A pre-commit hook in `.githooks/` (`core.hooksPath`) checks staged files for debug dumps, then runs php-cs-fixer, PHPStan and Deptrac on staged PHP files. Quality checks run only at commit time, not after every agent edit. `.env` is committed and holds defaults only; real secrets go in `.env.local` (git-ignored) or the secrets vault, read via `%env(...)%`. When something fails, read `var/log/dev.log` and the web profiler (`/_profiler`) before changing code.
+A pre-commit hook in `.githooks/` (`core.hooksPath`) blocks secrets (key files, local env files, private keys), checks staged files for debug dumps, then runs php-cs-fixer, PHPStan and Deptrac on staged PHP files. Quality checks run only at commit time, not after every agent edit. `.env` is committed and holds defaults only; real secrets go in `.env.local` (git-ignored) or the secrets vault, read via `%env(...)%`. When something fails, read `var/log/dev.log` and the web profiler (`/_profiler`) before changing code.
 
 ## Architecture
 
