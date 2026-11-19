@@ -42,7 +42,10 @@ OUT=$($PHP vendor/bin/php-cs-fixer fix --dry-run --diff --config=.php-cs-fixer.d
 
 # shellcheck disable=SC2086
 OUT=$($PHP vendor/bin/phpstan analyse --no-progress --error-format=raw $PHP_FILES 2>&1) || {
-  echo "pre-commit: PHPStan errors:" >&2; echo "$OUT" >&2; exit 1; }
+  # Staged files that are all in phpstan's excludePaths (e.g. tests/bootstrap.php) are not an error.
+  echo "$OUT" | grep -q 'No files found to analyse' && OUT="" || {
+    echo "pre-commit: PHPStan errors:" >&2; echo "$OUT" >&2; exit 1; }
+}
 
 # Deptrac checks layer rules across files, so it runs on the whole project.
 OUT=$($PHP vendor/bin/deptrac analyse --no-progress 2>&1) || {

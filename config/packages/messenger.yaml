@@ -50,4 +50,6 @@ framework:
                     topic_conf:
                         auto.offset.reset: 'earliest'
 
+        # Deliberately NOT routed: Identity's RegisterUser carries a plain-text password, so it must stay
+        # synchronous. Routing it to a transport would persist the password in the queue table.
         routing: ~

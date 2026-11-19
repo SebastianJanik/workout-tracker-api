@@ -34,11 +34,31 @@ deptrac:
           collectors:
             - type: classLike
               value: ^App\\Progress\\Presentation\\.*
+        - name: IdentityDomain
+          collectors:
+            - type: classLike
+              value: ^App\\Identity\\Domain\\.*
+        - name: IdentityApplication
+          collectors:
+            - type: classLike
+              value: ^App\\Identity\\Application\\.*
+        - name: IdentityInfrastructure
+          collectors:
+            - type: classLike
+              value: ^App\\Identity\\Infrastructure\\.*
+        - name: IdentityPresentation
+          collectors:
+            - type: classLike
+              value: ^App\\Identity\\Presentation\\.*
     ruleset:
         # A domain layer depends on SharedKernelDomain only: never on Symfony, Doctrine or other contexts.
         ProgressDomain: [SharedKernelDomain]
         ProgressApplication: [ProgressDomain, SharedKernelDomain, Framework]
         ProgressPresentation: [ProgressApplication, ProgressDomain, SharedKernelDomain, Framework]
+        IdentityDomain: [SharedKernelDomain]
+        IdentityApplication: [IdentityDomain, SharedKernelDomain, Framework]
+        IdentityInfrastructure: [IdentityDomain, IdentityApplication, SharedKernelDomain, Framework]
+        IdentityPresentation: [IdentityApplication, SharedKernelDomain, Framework]
         SharedKernelDomain: []
         SharedKernelInfrastructure: [SharedKernelDomain, Framework]
         SharedKernelPresentation: [SharedKernelDomain, Framework]

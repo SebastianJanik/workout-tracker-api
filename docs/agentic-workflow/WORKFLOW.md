@@ -46,4 +46,4 @@ Log it in the table below. The task 7 DoD needs at least 2 rule-file changes fro
 
 | # | Spec | Branch / PR | Checkpoints passed | Retro outcome |
 |---|---|---|---|---|
-| 1 | | | | |
+| 1 | 001 identity register/login | main (commits e08c238, 4cf9177) | spec ✅, plan ✅; manual diff review pending | Rule fixed: AGENTS.md folder list and "nothing built yet" line were stale after new Domain folders (updated). Plan assumption that `HandleTrait` unwraps exceptions was wrong (verify framework behaviour before planning around it). Tooling: block-dangerous hook false-positives on commands that merely mention the secrets file (task 3 follow-up). |

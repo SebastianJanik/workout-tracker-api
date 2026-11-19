@@ -4,6 +4,45 @@ nelmio_api_doc:
             title: Workout Tracker API
             description: Backend API for the Workout Tracker mobile app.
             version: 1.0.0
+        components:
+            securitySchemes:
+                Bearer:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+        # Every endpoint needs a JWT unless it overrides this with `security: []` (see the auth controllers).
+        security:
+            - Bearer: []
+        paths:
+            # Handled by gesdinet's refresh_jwt authenticator (no controller), so it is described here.
+            /api/auth/refresh:
+                post:
+                    operationId: refreshToken
+                    tags: [Authentication]
+                    summary: Exchange a refresh token for a new JWT (the refresh token is single-use and is replaced).
+                    security: []
+                    requestBody:
+                        required: true
+                        content:
+                            application/json:
+                                schema:
+                                    type: object
+                                    required: [refresh_token]
+                                    properties:
+                                        refresh_token: { type: string }
+                    responses:
+                        '200':
+                            description: New JWT and a new refresh token.
+                            content:
+                                application/json:
+                                    schema:
+                                        type: object
+                                        required: [token, refresh_token]
+                                        properties:
+                                            token: { type: string }
+                                            refresh_token: { type: string }
+                        '401':
+                            description: Unknown, expired or already used refresh token.
     areas: # to filter documented areas
         path_patterns:
-            - ^/api(?!/doc$) # Accepts routes under /api except /api/doc
+            - ^/api(?!/doc$) # Accepts routes under /api except /api/doc.json

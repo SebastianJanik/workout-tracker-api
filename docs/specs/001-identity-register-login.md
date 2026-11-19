@@ -1,6 +1,6 @@
 # 001: Identity — register, login, current user
 
-**Status:** approved (open questions settled: 12-char password, email as login name, single-use refresh tokens, `json_login`)
+**Status:** implemented, awaiting checkpoint 2 (manual diff review). Open questions settled: 12-char password, email as login name, single-use refresh tokens, `json_login`.
 **Milestone / agentic task:** M1 (first slice) / task 7 (first run through `WORKFLOW.md`); also gives real uses for tasks 1, 2 and 3.
 
 ## M1 split
@@ -23,14 +23,14 @@ A person can create an account with email and password, log in to get a JWT plus
 
 Each is proven by a test written first (TDD). HTTP tests use `WebTestCase`; the domain is covered by plain unit tests.
 
-- [ ] `POST /api/auth/register` with `{email, password}` returns **201** and `{id, email}`; the password is stored hashed, never returned.
-- [ ] Email is normalised (trimmed, lower-cased) and must be valid; password must be at least 12 characters. Invalid input returns **422** with violations per field (Validator, not hand-written checks).
-- [ ] Registering an email that already exists (case-insensitively) returns **409**. The unique index is the final guard, so two concurrent requests cannot both succeed.
-- [ ] `POST /api/auth/login` with correct credentials returns **200** with `{token, refresh_token}`; wrong password or unknown email returns **401** with the same body (no user enumeration).
-- [ ] `POST /api/auth/refresh` with a valid refresh token returns a new JWT; an invalid or used token returns **401**.
-- [ ] `GET /api/me` with a valid JWT returns `{id, email}`; without a token or with an expired one returns **401**.
-- [ ] `GET /api/health` and the three `/api/auth/*` routes stay public; everything else under `/api` requires a JWT.
-- [ ] The domain `User` has no Symfony or Doctrine dependency (Deptrac green); `SecurityUser` is an adapter in Infrastructure.
+- [x] `POST /api/auth/register` with `{email, password}` returns **201** and `{id, email}`; the password is stored hashed, never returned.
+- [x] Email is normalised (trimmed, lower-cased) and must be valid; password must be at least 12 characters. Invalid input returns **422** with violations per field (Validator, not hand-written checks).
+- [x] Registering an email that already exists (case-insensitively) returns **409**. The unique index is the final guard, so two concurrent requests cannot both succeed.
+- [x] `POST /api/auth/login` with correct credentials returns **200** with `{token, refresh_token}`; wrong password or unknown email returns **401** with the same body (no user enumeration).
+- [x] `POST /api/auth/refresh` with a valid refresh token returns a new JWT; an invalid or used token returns **401**.
+- [x] `GET /api/me` with a valid JWT returns `{id, email}`; without a token or with an expired one returns **401**.
+- [x] `GET /api/health` and the three `/api/auth/*` routes stay public; everything else under `/api` requires a JWT.
+- [x] The domain `User` has no Symfony or Doctrine dependency (Deptrac green); `SecurityUser` is an adapter in Infrastructure.
 
 ## Out of scope
 
@@ -69,9 +69,17 @@ New endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/aut
 
 None.
 
+## Deviations from the plan (found while implementing)
+
+- `HandleTrait` does not unwrap Messenger's `HandlerFailedException`, so a generic `UnwrapHandlerFailedExceptionListener` (SharedKernel) does it and the `framework.exceptions` mapping then yields 409/422.
+- `GET /api/me` is a query on `query.bus` (`GetUserProfile`), not a read of `SecurityUser`: Deptrac forbids Presentation from using Infrastructure.
+- `LoginController` exists only to declare the `check_path` route (and its OpenAPI docs); the firewall answers first.
+- Unknown `/api/*` paths return 404 from the router before the firewall; only existing routes return 401.
+- Added `dama/doctrine-test-bundle` (approved) for per-test rollback.
+
 ## Persistence
 
-- Table `identity_user`: `id` (uuid), `email` (unique, stored lower-case), `password_hash`, `roles` (json), `created_at`.
+- Table `users`: `id` (uuid), `email` (unique, stored lower-case), `password_hash`, `roles` (json), `created_at`.
 - Table `refresh_tokens` from the gesdinet bundle (owned by Identity).
 - Migrations in `migrations/Identity/` (namespace `DoctrineMigrations\Identity`, one shared timeline). No cross-context foreign keys.
 

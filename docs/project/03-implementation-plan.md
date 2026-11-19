@@ -313,6 +313,7 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 | 012 | Monorepo or separate repositories | **accepted:** separate (`workout-tracker-api`, `workout-tracker-mobile`). The contract is `docs/api/openapi.json`; consequence: hooks, rule files and CI per repo, TS client generated in the mobile repo |
 | 013 | Runtime environment | **accepted:** everything in Docker (OrbStack), no local PHP/Node; FrankenPHP as the server; `symfony/skeleton` instead of `--webapp`; Flex without Docker recipes |
 | 014 | Working language | **accepted:** English for code, docs, commits and conversation with the agent |
+| 015 | Test doubles for own code | **accepted:** no in-memory or fake implementations of our own ports (repositories, password hasher). Tests use the real service against the real test database (rolled back by DAMA). Pure domain tests need no kernel. Doubles only at the system boundary (Kafka, mail, HTTP to third parties, time via `MockClock`) |
 
 ## 6. Roadmap: far future (after everything else)
 

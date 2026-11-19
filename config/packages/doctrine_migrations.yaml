@@ -7,6 +7,7 @@ doctrine_migrations:
     #   'DoctrineMigrations\Identity': '%kernel.project_dir%/migrations/Identity'
     migrations_paths:
         'DoctrineMigrations\Shared': '%kernel.project_dir%/migrations/Shared'
+        'DoctrineMigrations\Identity': '%kernel.project_dir%/migrations/Identity'
     services:
         # Sort by timestamp, not by namespace (see the class docblock).
         'Doctrine\Migrations\Version\Comparator': 'App\SharedKernel\Infrastructure\Doctrine\TimestampVersionComparator'

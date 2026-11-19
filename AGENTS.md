@@ -11,7 +11,7 @@ Working rules for this repo, for any coding agent or developer. Claude Code read
 | Agentic tasks 0-7: requirements, DoD, status; ADR list | `docs/project/03-implementation-plan.md` |
 | Analytics decisions | `docs/progress/DECISIONS.md` |
 
-This repo is the **backend only**. The mobile app lives in a separate repo, `workout-tracker-mobile` (ADR-012). Currently built: Symfony 8.1 infrastructure (Doctrine, Messenger, Kafka, `GET /api/health`), quality tooling and the pure Progress core for strength. Check `composer.json` and the task statuses in the plan before assuming something exists (no Security, Nelmio or other contexts yet).
+This repo is the **backend only**. The mobile app lives in a separate repo, `workout-tracker-mobile` (ADR-012). Currently built: Symfony 8.1 infrastructure (Doctrine, Messenger, Kafka, `GET /api/health`), quality tooling and the pure Progress core for strength, and the Identity context (register, login, refresh, `GET /api/me`; JWT via Security, OpenAPI via Nelmio). Check `composer.json` and the task statuses in the plan before assuming something exists (no Coaching or other contexts yet).
 
 ## Nested rule files
 
@@ -56,8 +56,8 @@ A pre-commit hook in `.githooks/` (`core.hooksPath`) blocks secrets (key files, 
 ## Architecture
 
 - DDD bounded contexts as sub-namespaces of `App\` (`src/<Context>/{Domain,Application,Infrastructure,Presentation}`): Identity, Coaching, TrainingLibrary, Strength, Padel, Progress, plus SharedKernel (IDs, `Duration`, `Mass`, shared ports, buses, outbox, inbox, Kafka). Strength and Padel sessions are separate models, not one table with a flag. New training types must be addable without modifying existing ones (Open/Closed).
-- The domain layer does not depend on Symfony or Doctrine (PSR interfaces such as `ClockInterface` are fine); Deptrac enforces this. Doctrine mappings are XML, outside the domain.
-- Inside `Domain/` group classes by DDD building block, never flat (under the module folder if there is one). Currently used: `ValueObject/` (incl. enums) and `Service/` (see `src/Progress/Domain/Strength`). Don't create or suggest other folders up front. If a class doesn't fit (first aggregate, repository port, domain event...), propose a new folder named after its DDD building block and ask before adding it.
+- The domain layer does not depend on Symfony or Doctrine (PSR interfaces such as `ClockInterface` are fine); Deptrac enforces this. Doctrine mappings are XML, outside the domain. Each context registers its own Doctrine types and XML mapping directory in its `src/<Context>/<Context>Bundle.php` (`prependExtension()`), never in the shared `config/packages/doctrine.yaml`. Map value objects as XML embeddables, which need no registration; only identifiers need a custom DBAL type (an embeddable cannot be an id).
+- Inside `Domain/` group classes by DDD building block, never flat (under the module folder if there is one). Currently used: `ValueObject/` (incl. enums), `Service/` (see `src/Progress/Domain/Strength`), `Aggregate/`, `Repository/` (ports) and `Exception/` (see `src/Identity/Domain`; `src/SharedKernel/Domain/Exception` holds the HTTP marker interfaces below). Don't create or suggest other folders up front. If a class doesn't fit (first aggregate, repository port, domain event...), propose a new folder named after its DDD building block and ask before adding it.
 - Contexts talk to each other only via integration events (outbox, then Kafka, versioned schemas in `docs/contracts/`, partition key `athleteId`, idempotent inbox consumers keyed by `eventId`) or a context's public facade/query, never through another context's entities or repositories.
 - Messenger has separate `command.bus`, `query.bus` and `event.bus`.
 - Messages (commands, queries, events) are immutable `final readonly` DTOs holding primitives only (no entities, no objects with behaviour), so they serialize safely.
@@ -82,11 +82,14 @@ Follow https://symfony.com/doc/current/best_practices.html:
 - Every PHP file starts with `declare(strict_types=1);`. Classes are `final` unless designed for extension.
 - Value objects and aggregates are built through named constructors (`Mass::fromKilograms()`), not public constructors with loose primitives.
 - Domain code throws domain exceptions for invalid states and missing things; it doesn't return `null` to signal failure.
+- A domain exception gets its HTTP meaning by implementing a marker from `App\SharedKernel\Domain\Exception`: `Conflict` (409), `NotFound` (404), `InvalidInput` (422). `DomainExceptionListener` maps them for the whole app. Never list exceptions one by one in `framework.yaml`, and never make a domain exception extend an `HttpException`. A new status means a new marker plus one line in the listener. An exception with no marker stays a 500.
 - Controllers only map the request to a message/DTO, dispatch, and map the result back. No business logic.
 
 ## Testing
 
 Functional/HTTP tests extend `WebTestCase`; service-level tests extend `KernelTestCase`. A feature isn't done until a test exercises it the way a caller would (an HTTP request for a controller, a service call for a service), not just "it didn't throw." Contract tests in `progress-contract` are never changed to make them pass; a deliberate change is recorded in `docs/progress/DECISIONS.md`.
+
+No in-memory repositories or fake implementations of our own ports (ADR-015): handler and service tests extend `KernelTestCase` and use the real repository, hasher and test database (DAMA rolls each test back). Pure domain tests need no kernel. Doubles are only for the system boundary (Kafka, mail, external HTTP, time via `MockClock`).
 
 Workflow: write the failing test first (TDD), then the code. After every change run the tests of the affected context (e.g. `vendor/bin/phpunit --filter Progress`), and the full set of quality tools before finishing.
 
