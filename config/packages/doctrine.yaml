@@ -13,7 +13,14 @@ doctrine:
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
-        # XML mappings per bounded context are added with the first context (M1).
+        # XML mappings per bounded context (prefix = the context namespace, files named
+        # <Path.Under.Prefix>.orm.xml, e.g. Domain.Entity.User.orm.xml).
+        mappings:
+            Identity:
+                type: xml
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Identity/Infrastructure/Persistence/Doctrine/Mapping'
+                prefix: 'App\Identity'
 
 when@test:
     doctrine:

@@ -7,10 +7,13 @@
         "php": ">=8.4",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "doctrine/doctrine-bundle": "^3.3",
+        "doctrine/doctrine-bundle": "^3.4.2",
         "doctrine/doctrine-migrations-bundle": "^4.0",
-        "doctrine/orm": "^3.7",
+        "doctrine/orm": "^3.8",
+        "gesdinet/jwt-refresh-token-bundle": "^3.1",
         "koco/messenger-kafka": "^0.19.0",
+        "lexik/jwt-authentication-bundle": "^3.2",
+        "nelmio/api-doc-bundle": "^5.14",
         "symfony/console": "8.1.*",
         "symfony/doctrine-messenger": "8.1.*",
         "symfony/dotenv": "8.1.*",
@@ -18,6 +21,9 @@
         "symfony/framework-bundle": "8.1.*",
         "symfony/messenger": "8.1.*",
         "symfony/runtime": "8.1.*",
+        "symfony/security-bundle": "8.1.*",
+        "symfony/serializer": "8.1.*",
+        "symfony/uid": "8.1.*",
         "symfony/validator": "8.1.*",
         "symfony/yaml": "8.1.*"
     },
@@ -69,15 +75,15 @@
     },
     "extra": {
         "symfony": {
-            "allow-contrib": false,
+            "allow-contrib": "true",
             "docker": false,
             "require": "8.1.*"
         }
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.95",
-        "phpstan/phpstan": "^2.3",
-        "phpunit/phpunit": "^13.4",
+        "friendsofphp/php-cs-fixer": "^3.95.32",
+        "phpstan/phpstan": "^2.3.7",
+        "phpunit/phpunit": "^13.4.8",
         "qossmic/deptrac": "^2.0",
         "symfony/browser-kit": "8.1.*",
         "symfony/css-selector": "8.1.*"
