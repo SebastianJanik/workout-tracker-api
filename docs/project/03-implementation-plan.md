@@ -214,13 +214,13 @@ Steps: test in MCP Inspector (in a container or via `docker compose run`), regis
 ### Task 5: subagents
 *Multiple subagents split by task type*
 
-**Status:** ☐ not started.
+**Status:** ⏳ in progress (`code-reviewer`, `implementer`, `domain-modeler` exist; `test-writer` deferred; the "real problem found in 2 cases" DoD item is open).
 
 In `.claude/agents/`:
 - `implementer`: code compliant with AGENTS.md and TDD, full tools.
 - `code-reviewer`: read-only (Read, Grep, Glob, Bash for tests). Checklist below.
 - `test-writer`: tests, edge cases, handlers on `in-memory://`, Object Mothers.
-- `domain-modeler`: read-only; checks consistency with `docs/project/01-domain-model.md` and `docs/domain/` (ubiquitous language, aggregate boundaries, whether an event leaks between contexts, whether an anaemic model is emerging).
+- `domain-modeler`: read-only; checks consistency with `docs/project/01-domain-model.md` (ubiquitous language, aggregate boundaries, whether an event leaks between contexts, whether an anaemic model is emerging).
 - `mobile-implementer` will be created in the mobile repo.
 
 `code-reviewer` reads the shared `.agents/skills/review/checklist.md` (frontmatter `tools: Read, Grep, Glob, Bash`). Areas it must cover:
@@ -314,6 +314,7 @@ Optionally: the same pipeline in GitHub Actions with Kafka as a service containe
 | 013 | Runtime environment | **accepted:** everything in Docker (OrbStack), no local PHP/Node; FrankenPHP as the server; `symfony/skeleton` instead of `--webapp`; Flex without Docker recipes |
 | 014 | Working language | **accepted:** English for code, docs, commits and conversation with the agent |
 | 015 | Test doubles for own code | **accepted:** no in-memory or fake implementations of our own ports (repositories, password hasher). Tests use the real service against the real test database (rolled back by DAMA). Pure domain tests need no kernel. Doubles only at the system boundary (Kafka, mail, HTTP to third parties, time via `MockClock`) |
+| 016 | Subagent portability | **accepted:** subagents are Claude Code only for now (`.claude/agents/`). They stay thin and point at the shared rules (`AGENTS.md`, `.agents/skills/review/checklist.md`), so no rule is duplicated. Other tools have their own agent folders and formats and no shared location exists yet; supporting one later means a thin copy or symlink there, not new rules. Orchestration differs most between tools, so check it per tool in task 6. **Known limitation:** a subagent's `tools:` line can't restrict Bash by command, so `code-reviewer` is read-only by prompt only (the `review` skill does restrict it via `allowed-tools`). Accepted for now; a permission rule would be a settings change. `implementer` has no `tools:` line on purpose (inherits all tools, as the plan says) |
 
 ## 6. Roadmap: far future (after everything else)
 

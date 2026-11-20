@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git 
 
 # review
 
-Review the local changes against [checklist.md](checklist.md). The checklist is the single source of review rules; the future `code-reviewer` subagent (task 5) must read the same file instead of keeping a copy. The checklist is deliberately generic; repo specifics come from `AGENTS.md` and `docs/`, so it needs no edits when the code changes.
+Review the local changes against [checklist.md](checklist.md). The checklist is the single source of review rules; the `code-reviewer` subagent (task 5) reads the same file instead of keeping a copy. The checklist is deliberately generic; repo specifics come from `AGENTS.md` and `docs/`, so it needs no edits when the code changes.
 
 ## Steps
 
